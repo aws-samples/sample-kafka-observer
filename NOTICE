@@ -1,0 +1,13 @@
+sample-kafka-observer
+Copyright 2026 Amazon Web Services, Inc.
+
+This project provides patches for Apache Kafka.
+Apache Kafka is a trademark of the Apache Software Foundation.
+
+This project is NOT affiliated with, endorsed by, or part of the
+Apache Software Foundation or Confluent, Inc. Binaries built with
+these patches are modified versions of Apache Kafka — if redistributed,
+they must be clearly marked as modified per the Apache License 2.0.
+
+The patch files in patches/ contain code fragments derived from
+Apache Kafka source code, licensed under the Apache License 2.0.

@@ -1,0 +1,7 @@
+*.pyc
+__pycache__/
+.terraform/
+*.tfstate*
+.DS_Store
+kafka-src/
+build/
