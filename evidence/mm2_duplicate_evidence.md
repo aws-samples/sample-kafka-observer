@@ -6,8 +6,8 @@
 
 ## 环境
 - 时间：2026-07-20 UTC
-- loadgen：54.250.248.165（内网 172.31.2.106），Kafka 4.0 at `/opt/kafka4`，JDK 17
-- 源集群（主 POC 集群）：bootstrap 172.31.10.13:9092，broker 2@ap-northeast-1c / broker 3@ap-northeast-1d
+- loadgen：EC2 m7g.xlarge（Tokyo），Kafka 4.0 at `/opt/kafka4`，JDK 17
+- 源集群（主 POC 集群）：bootstrap <source-broker>:9092，broker 2@ap-northeast-1c / broker 3@ap-northeast-1d
 - 目标集群：loadgen 上单节点 KRaft（broker+controller combined），PLAINTEXT 127.0.0.1:9192，
   controller 127.0.0.1:9193，数据目录 /tmp/mm2-target，cluster id S-eFQmhUT_OtyIc9ACRK2A
 - MM2：`/opt/kafka4/bin/connect-mirror-maker.sh /tmp/mm2.properties`，source→target 单向，
@@ -65,6 +65,6 @@
 
 ## 产物
 - 远端证据：loadgen `/tmp/mm2-evidence.md`（已保留）
-- 本地证据：本文件 `/Users/jiasunm/Code/self-managed-kafka-on-aws/poc/state/mm2_duplicate_evidence.md`
+- 本地证据：本文件
 - 清理：MM2 进程已 kill，目标 KRaft broker 已停，源 topic mm2_src 已从主集群删除；主集群 50 个
   topic 健康未受影响。

@@ -1,7 +1,7 @@
 # KRaft 模式 broker 侧 hook 真机探针证据
 
 - 日期: 2026-07-20 (JST 18:43-18:47, 日志时间戳为 UTC 09:43-09:47)
-- 环境: 东京 loadgen (54.250.248.165), 单机 3 节点 KRaft 集群 (node 1 combined broker+controller @9292/9393, node 2/3 broker-only @9294/9296), 数据目录 /tmp/kraft-probe, 与现有 ZK 集群 (9092) 完全隔离
+- 环境: Tokyo build host (EC2, m7g.xlarge), 单机 3 节点 KRaft 集群 (node 1 combined broker+controller @9292/9393, node 2/3 broker-only @9294/9296), 数据目录 /tmp/kraft-probe, 与现有 ZK 集群 (9092) 完全隔离
 - Jar: /tmp/kafka-src 打过 v3 patch 的 Kafka 3.7.1 (`kafka_2.13-3.7.1.jar`, patch 脚本 = `patches/kafka-3.7.1-zk-v0.3.py`)
 - 探针后已完整清理 (进程 kill、/tmp/kraft-probe 删除、9292/9294/9296/9393 端口释放), ZK 集群未受影响
 
