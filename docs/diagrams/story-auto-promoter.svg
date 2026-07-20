@@ -1,0 +1,207 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+  <!-- Story animation: auto-promoter daemon full cycle, 22 s loop, 6 phases (0-3-7-10.5-14.5-19-22 s) -->
+  <rect x="0" y="0" width="1000" height="640" rx="12" fill="#1a2332"/>
+  <text x="30" y="34" fill="#e6edf3" font-size="19" font-weight="700">Story · Auto-promoter — a watchdog that edits the same file you would</text>
+  <text x="970" y="34" fill="#9fb0c3" font-size="12" text-anchor="end">22 s loop · daemon is external, killable, audit-logged</text>
+
+  <!-- ===== Phase banners ===== -->
+  <g font-size="20" font-weight="800" text-anchor="middle">
+    <text x="500" y="78" fill="#9fb0c3" opacity="0">PHASE 0 · Steady state — daemon scans every 10 s: ISR=2 ≥ minISR=2 ✓
+      <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.01;0.125;0.1364;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="500" y="78" fill="#ff453a" opacity="0">PHASE 1 · Follower dies — next scan: DETECT ISR=1 &lt; minISR=2
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.1364;0.15;0.305;0.3182;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="500" y="78" fill="#bf5af2" opacity="0">PHASE 2 · Eligibility check — observer offsetLag = 0 ≤ threshold ✓
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.3182;0.33;0.465;0.4773;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="500" y="78" fill="#d29922" opacity="0">PHASE 3 · PROMOTE — daemon edits observer.ids, logs every decision
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.4773;0.49;0.645;0.6591;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="500" y="78" fill="#30d158" opacity="0">PHASE 4 · Native ISR expand → writes resume — total ≤14 s, no human
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.6591;0.672;0.85;0.8636;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="500" y="78" fill="#58a6ff" opacity="0">PHASE 5 · Follower returns — daemon DEMOTEs what it promoted, steady again
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.8636;0.876;0.99;1" dur="22s" repeatCount="indefinite"/></text>
+  </g>
+
+  <!-- ===== Upper half: cluster ===== -->
+  <!-- ISR boundary -->
+  <rect x="85" y="108" width="520" height="180" rx="10" fill="none" stroke="#30d158" stroke-width="2">
+    <animate attributeName="width" values="520;520;830;830;520;520" keyTimes="0;0.66;0.70;0.93;0.96;1" dur="22s" repeatCount="indefinite"/>
+  </rect>
+  <g font-size="13" font-weight="700">
+    <text x="100" y="130" fill="#30d158">ISR = {1, 2}
+      <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.1364;0.16;0.955;0.975;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="100" y="130" fill="#ff453a" opacity="0">ISR = {1} — below minISR=2 ⚠
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.1364;0.16;0.68;0.70;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="100" y="130" fill="#30d158" opacity="0">ISR = {1, 3}
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.68;0.70;0.935;0.955;1" dur="22s" repeatCount="indefinite"/></text>
+  </g>
+
+  <!-- broker 1: leader -->
+  <g>
+    <rect x="110" y="148" width="170" height="105" rx="10" fill="#223044" stroke="#ff9900" stroke-width="3"/>
+    <text x="195" y="180" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 1</text>
+    <text x="195" y="202" fill="#ff9900" font-size="13" font-weight="700" text-anchor="middle">LEADER</text>
+    <text x="195" y="223" fill="#9fb0c3" font-size="11" text-anchor="middle">AZ-a</text>
+  </g>
+  <!-- broker 2: follower, dies in PHASE 1, returns in PHASE 5 -->
+  <g>
+    <rect x="395" y="148" width="170" height="105" rx="10" fill="#223044" stroke="#30d158" stroke-width="2"/>
+    <text x="480" y="180" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 2</text>
+    <text x="480" y="202" fill="#30d158" font-size="13" font-weight="700" text-anchor="middle">follower · in ISR</text>
+    <text x="480" y="223" fill="#9fb0c3" font-size="11" text-anchor="middle">AZ-b</text>
+  </g>
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.1364;0.16;0.875;0.90;1" dur="22s" repeatCount="indefinite"/>
+    <rect x="395" y="148" width="170" height="105" rx="10" fill="#2b1a1c" stroke="#ff453a" stroke-width="3"/>
+    <text x="480" y="180" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 2</text>
+    <text x="480" y="205" fill="#ff453a" font-size="16" font-weight="800" text-anchor="middle">✗ DOWN</text>
+    <text x="480" y="226" fill="#9fb0c3" font-size="11" text-anchor="middle">AZ-b</text>
+  </g>
+  <!-- broker 3: observer, promoted in PHASE 4, demoted in PHASE 5 -->
+  <g>
+    <rect x="700" y="148" width="170" height="105" rx="10" fill="#241f33" stroke="#bf5af2" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="785" y="180" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 3</text>
+    <text x="785" y="202" fill="#bf5af2" font-size="13" font-weight="700" text-anchor="middle">OBSERVER</text>
+    <text x="785" y="223" fill="#9fb0c3" font-size="11" text-anchor="middle">AZ-c · lag = 0</text>
+  </g>
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.66;0.70;0.935;0.96;1" dur="22s" repeatCount="indefinite"/>
+    <rect x="700" y="148" width="170" height="105" rx="10" fill="#16281f" stroke="#30d158" stroke-width="2.5"/>
+    <text x="785" y="180" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 3</text>
+    <text x="785" y="202" fill="#30d158" font-size="13" font-weight="700" text-anchor="middle">ISR MEMBER</text>
+    <text x="785" y="223" fill="#9fb0c3" font-size="11" text-anchor="middle">AZ-c · electable ✓</text>
+  </g>
+
+  <!-- replication dots: leader -> broker2 (stops when dead) -->
+  <g>
+    <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.1364;0.16;0.90;0.93;1" dur="22s" repeatCount="indefinite"/>
+    <line x1="280" y1="200" x2="395" y2="200" stroke="#3d4f66" stroke-width="1.5"/>
+    <circle r="4.5" fill="#4dabf7"><animateMotion path="M280,200 L395,200" dur="1.4s" repeatCount="indefinite"/></circle>
+  </g>
+  <!-- leader -> observer replication (always on; purple as observer, green when promoted) -->
+  <g>
+    <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.66;0.70;0.945;0.97;1" dur="22s" repeatCount="indefinite"/>
+    <path d="M285,255 C 430,300 555,300 700,245" fill="none" stroke="#bf5af2" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.7"/>
+    <circle r="3.5" fill="#bf5af2"><animateMotion path="M285,255 C 430,300 555,300 700,245" dur="2.2s" repeatCount="indefinite"/></circle>
+  </g>
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.66;0.70;0.935;0.96;1" dur="22s" repeatCount="indefinite"/>
+    <path d="M285,255 C 430,300 555,300 700,245" fill="none" stroke="#30d158" stroke-width="1.5"/>
+    <circle r="4.5" fill="#30d158"><animateMotion path="M285,255 C 430,300 555,300 700,245" dur="1.4s" repeatCount="indefinite"/></circle>
+  </g>
+
+  <!-- writes status line -->
+  <g font-size="13" font-weight="700">
+    <text x="500" y="330" text-anchor="middle" fill="#30d158">producer acks=all · writes OK (2.3 ms)
+      <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.1364;0.155;0.97;0.99;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="500" y="330" text-anchor="middle" fill="#ff453a" opacity="0">writes fail-stop: NOT_ENOUGH_REPLICAS ✗ (no silent data loss)
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.1364;0.155;0.68;0.70;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="500" y="330" text-anchor="middle" fill="#30d158" opacity="0">writes resumed ✓ — fault → detect → promote → resume: total ≤14 s
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.68;0.70;0.95;0.97;1" dur="22s" repeatCount="indefinite"/></text>
+  </g>
+
+  <!-- ===== Lower half: daemon + observer.ids + audit log ===== -->
+  <!-- daemon box -->
+  <rect x="60" y="370" width="330" height="235" rx="10" fill="#0d1420" stroke="#58a6ff" stroke-width="2"/>
+  <text x="80" y="396" fill="#58a6ff" font-size="14" font-weight="700">observer-auto-promoter.sh</text>
+  <text x="80" y="414" fill="#9fb0c3" font-size="10.5">external daemon · scan every 10 s · kill switch: systemctl stop</text>
+
+  <!-- radar -->
+  <circle cx="150" cy="510" r="60" fill="none" stroke="#3d4f66" stroke-width="1.5"/>
+  <circle cx="150" cy="510" r="40" fill="none" stroke="#3d4f66" stroke-width="1"/>
+  <circle cx="150" cy="510" r="20" fill="none" stroke="#3d4f66" stroke-width="1"/>
+  <!-- sweep: green normally -->
+  <g>
+    <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.1364;0.15;0.66;0.68;1" dur="22s" repeatCount="indefinite"/>
+    <line x1="150" y1="510" x2="150" y2="452" stroke="#30d158" stroke-width="2.5" stroke-linecap="round">
+      <animateTransform attributeName="transform" type="rotate" from="0 150 510" to="360 150 510" dur="2.5s" repeatCount="indefinite"/>
+    </line>
+  </g>
+  <!-- sweep: red while under-min-isr -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.1364;0.15;0.66;0.68;1" dur="22s" repeatCount="indefinite"/>
+    <line x1="150" y1="510" x2="150" y2="452" stroke="#ff453a" stroke-width="2.5" stroke-linecap="round">
+      <animateTransform attributeName="transform" type="rotate" from="0 150 510" to="360 150 510" dur="1.2s" repeatCount="indefinite"/>
+    </line>
+  </g>
+  <!-- radar blip = broker 2 disappears -->
+  <circle cx="185" cy="480" r="5" fill="#30d158">
+    <animate attributeName="fill" values="#30d158;#30d158;#ff453a;#ff453a;#30d158;#30d158" keyTimes="0;0.1364;0.16;0.875;0.90;1" dur="22s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="120" cy="540" r="5" fill="#ff9900"/>
+  <circle cx="180" cy="545" r="5" fill="#bf5af2">
+    <animate attributeName="fill" values="#bf5af2;#bf5af2;#30d158;#30d158;#bf5af2;#bf5af2" keyTimes="0;0.66;0.70;0.935;0.96;1" dur="22s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- daemon status text -->
+  <g font-size="12" font-weight="700" font-family="ui-monospace,Menlo,monospace">
+    <text x="230" y="480" fill="#30d158">scan: ISR=2 ≥ minISR ✓
+      <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.1364;0.15;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="230" y="480" fill="#ff453a" opacity="0">DETECT: ISR=1 &lt; minISR=2
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.1364;0.15;0.305;0.3182;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="230" y="480" fill="#bf5af2" opacity="0">check broker 3: lag=0 ✓
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.3182;0.33;0.465;0.4773;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="230" y="480" fill="#d29922" opacity="0">action: PROMOTE broker 3
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.4773;0.49;0.645;0.66;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="230" y="480" fill="#30d158" opacity="0">cooldown 300 s · watching
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.66;0.672;0.85;0.8636;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="230" y="480" fill="#58a6ff" opacity="0">recovered → DEMOTE broker 3
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.8636;0.876;0.99;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="230" y="502" fill="#9fb0c3" font-weight="400">one action per scan · anti-flap</text>
+    <text x="230" y="522" fill="#9fb0c3" font-weight="400">only demotes what it promoted</text>
+  </g>
+
+  <!-- observer.ids file (center bottom) -->
+  <g>
+    <path d="M448,430 h58 l18,18 v70 h-76 z" fill="#241f33" stroke="#bf5af2" stroke-width="2">
+      <animate attributeName="stroke" values="#bf5af2;#bf5af2;#d29922;#d29922;#bf5af2;#bf5af2" keyTimes="0;0.4773;0.49;0.66;0.68;1" dur="22s" repeatCount="indefinite"/>
+    </path>
+    <path d="M506,430 v18 h18" fill="none" stroke="#bf5af2" stroke-width="2"/>
+    <text x="486" y="540" fill="#bf5af2" font-size="12" font-weight="700" text-anchor="middle">observer.ids</text>
+    <g font-size="13" font-weight="700" text-anchor="middle" font-family="ui-monospace,Menlo,monospace">
+      <text x="486" y="482" fill="#e6edf3">3
+        <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.51;0.53;0.955;0.975;1" dur="22s" repeatCount="indefinite"/></text>
+      <text x="486" y="482" fill="#d29922" opacity="0">∅
+        <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.51;0.53;0.955;0.975;1" dur="22s" repeatCount="indefinite"/></text>
+    </g>
+    <text x="486" y="562" fill="#9fb0c3" font-size="10" text-anchor="middle">same file the manual runbook edits</text>
+  </g>
+
+  <!-- daemon -> file arrow (PHASE 3 promote + PHASE 5 demote) -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0;1;1;0" keyTimes="0;0.4773;0.49;0.645;0.66;0.8636;0.876;0.975;1" dur="22s" repeatCount="indefinite"/>
+    <line x1="392" y1="478" x2="440" y2="478" stroke="#d29922" stroke-width="2"/>
+    <path d="M440,478 l-9,-5 v10 z" fill="#d29922"/>
+    <circle r="4" fill="#d29922"><animateMotion path="M392,478 L436,478" dur="0.8s" repeatCount="indefinite"/></circle>
+    <text x="416" y="466" fill="#d29922" font-size="10.5" font-weight="700" text-anchor="middle">atomic write</text>
+  </g>
+  <!-- file -> cluster arrow (brokers pick it up live) -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.53;0.55;0.70;0.72;1" dur="22s" repeatCount="indefinite"/>
+    <path d="M510,425 C 560,380 660,320 730,262" fill="none" stroke="#30d158" stroke-width="1.5" stroke-dasharray="5 5"/>
+    <circle r="4" fill="#30d158"><animateMotion path="M510,425 C 560,380 660,320 730,262" dur="1.2s" repeatCount="indefinite"/></circle>
+    <text x="640" y="352" fill="#30d158" font-size="10.5" font-weight="700">cache refresh ≤5 s → gate opens → native expand ≤10 s</text>
+  </g>
+
+  <!-- audit log panel -->
+  <rect x="590" y="370" width="380" height="235" rx="10" fill="#0d1420" stroke="#3d4f66" stroke-width="1.5"/>
+  <circle cx="610" cy="390" r="4.5" fill="#ff453a"/><circle cx="626" cy="390" r="4.5" fill="#d29922"/><circle cx="642" cy="390" r="4.5" fill="#30d158"/>
+  <text x="660" y="394" fill="#9fb0c3" font-size="11" font-weight="700">/var/log/observer-promoter.log — append-only audit trail</text>
+  <g font-size="11.5" font-family="ui-monospace,Menlo,monospace">
+    <text x="610" y="424" fill="#9fb0c3">12:00:00 SCAN t0: ISR={1,2} ≥ minISR=2 OK</text>
+    <text x="610" y="446" fill="#ff453a" opacity="0">12:00:14 DETECT t0-p0 ISR={1} &lt; minISR=2
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.15;0.17;0.99;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="610" y="468" fill="#bf5af2" opacity="0">12:00:15 CHECK broker 3 offsetLag=0 ≤ 0 ✓
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.33;0.35;0.99;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="610" y="490" fill="#d29922" opacity="0">12:00:15 PROMOTE broker 3 (edit observer.ids)
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.49;0.51;0.99;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="610" y="512" fill="#30d158" opacity="0">12:00:22 VERIFY ISR={1,3} — writes resumed
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.70;0.72;0.99;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="610" y="534" fill="#58a6ff" opacity="0">12:05:41 DEMOTE broker 3 (ISR recovered ×2)
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.89;0.91;0.99;1" dur="22s" repeatCount="indefinite"/></text>
+    <text x="610" y="562" fill="#9fb0c3" opacity="0">12:05:58 SCAN t0: ISR={1,2} ≥ minISR=2 OK
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.955;0.97;0.99;1" dur="22s" repeatCount="indefinite"/></text>
+  </g>
+  <text x="610" y="592" fill="#9fb0c3" font-size="10.5">every decision reconstructable · reviewable by compliance</text>
+
+  <!-- footer -->
+  <text x="500" y="628" fill="#9fb0c3" font-size="11.5" text-anchor="middle">The daemon never touches Kafka internals — it only edits observer.ids; catch-up, ISR expand/shrink and HW are all native Kafka.</text>
+</svg>

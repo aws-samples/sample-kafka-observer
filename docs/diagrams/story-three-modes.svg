@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+  <!-- Story animation: three operational modes side by side, 15 s loop -->
+  <rect x="0" y="0" width="1000" height="620" rx="12" fill="#1a2332"/>
+  <text x="30" y="34" fill="#e6edf3" font-size="19" font-weight="700">Story · Three operational modes — who edits observer.ids, and when</text>
+  <text x="970" y="34" fill="#9fb0c3" font-size="12" text-anchor="end">15 s loop · all three columns replay the same fault</text>
+
+  <!-- shared fault marker: all three columns start with the same failure at t=1s -->
+  <g font-size="13" font-weight="700" text-anchor="middle">
+    <text x="500" y="66" fill="#ff453a" opacity="0">⚡ same fault in all three columns: follower dies, ISR &lt; minISR, writes fail-stop
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.067;0.93;1" dur="15s" repeatCount="indefinite"/></text>
+  </g>
+
+  <!-- ===== Column frames ===== -->
+  <rect x="35" y="84" width="295" height="452" rx="10" fill="#0d1420" stroke="#ff9900" stroke-width="2"/>
+  <rect x="352" y="84" width="295" height="452" rx="10" fill="#0d1420" stroke="#58a6ff" stroke-width="2"/>
+  <rect x="669" y="84" width="295" height="452" rx="10" fill="#0d1420" stroke="#30d158" stroke-width="2"/>
+
+  <text x="182" y="112" fill="#ff9900" font-size="16" font-weight="800" text-anchor="middle">① MANUAL</text>
+  <text x="182" y="130" fill="#9fb0c3" font-size="10.5" text-anchor="middle">recommended for financial workloads</text>
+  <text x="499" y="112" fill="#58a6ff" font-size="16" font-weight="800" text-anchor="middle">② AUTO</text>
+  <text x="499" y="130" fill="#9fb0c3" font-size="10.5" text-anchor="middle">auto-promoter daemon, real mode</text>
+  <text x="816" y="112" fill="#30d158" font-size="16" font-weight="800" text-anchor="middle">③ HYBRID</text>
+  <text x="816" y="130" fill="#9fb0c3" font-size="10.5" text-anchor="middle">recommended for most</text>
+
+  <!-- ===== shared fault icon per column (flash at ~1s) ===== -->
+  <g font-size="22" text-anchor="middle">
+    <text x="182" y="172" fill="#ff453a" opacity="0">✗ follower down
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.067;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <animate attributeName="font-size" values="22;26;22" keyTimes="0;0.067;0.13" dur="15s" repeatCount="indefinite"/></text>
+    <text x="499" y="172" fill="#ff453a" opacity="0">✗ follower down
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.067;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <animate attributeName="font-size" values="22;26;22" keyTimes="0;0.067;0.13" dur="15s" repeatCount="indefinite"/></text>
+    <text x="816" y="172" fill="#ff453a" opacity="0">✗ follower down
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.067;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <animate attributeName="font-size" values="22;26;22" keyTimes="0;0.067;0.13" dur="15s" repeatCount="indefinite"/></text>
+  </g>
+
+  <!-- ===== Column 1: MANUAL — fault → alarm bell → human → command → recovery ===== -->
+  <g text-anchor="middle">
+    <!-- bell rings -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.13;0.16;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <text x="182" y="232" fill="#d29922" font-size="24">🔔
+        <animateTransform attributeName="transform" type="rotate" values="0 182 226;-14 182 226;14 182 226;0 182 226" dur="0.6s" repeatCount="indefinite"/></text>
+      <text x="182" y="256" fill="#d29922" font-size="11.5" font-weight="700">alert fires → pager</text>
+    </g>
+    <!-- human wakes up, reads runbook -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.28;0.32;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <circle cx="182" cy="292" r="12" fill="none" stroke="#e6edf3" stroke-width="2"/>
+      <path d="M162,330 q20,-22 40,0" fill="none" stroke="#e6edf3" stroke-width="2"/>
+      <text x="182" y="352" fill="#9fb0c3" font-size="11.5" font-weight="700">human opens runbook, runs pre-checks</text>
+    </g>
+    <!-- command -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.47;0.51;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <rect x="55" y="368" width="255" height="40" rx="6" fill="#1a2332" stroke="#ff9900" stroke-width="1.5"/>
+      <text x="182" y="393" fill="#e6edf3" font-size="11.5" font-family="ui-monospace,Menlo,monospace">$ ./observer-promote.sh 3</text>
+    </g>
+    <!-- recovery -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.63;0.67;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <text x="182" y="444" fill="#30d158" font-size="15" font-weight="800">✓ writes resume</text>
+    </g>
+    <rect x="55" y="466" width="255" height="48" rx="8" fill="#241f0d" stroke="#ff9900" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.63;0.67;0.98;1" dur="15s" repeatCount="indefinite"/></rect>
+    <text x="182" y="486" fill="#ff9900" font-size="13" font-weight="800" opacity="0">RTO = human + 9 s
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.63;0.67;0.98;1" dur="15s" repeatCount="indefinite"/></text>
+    <text x="182" y="504" fill="#9fb0c3" font-size="10.5" opacity="0">every ISR change is a deliberate decision
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.63;0.67;0.98;1" dur="15s" repeatCount="indefinite"/></text>
+  </g>
+
+  <!-- ===== Column 2: AUTO — fault → daemon detects → edits file → recovery ===== -->
+  <g text-anchor="middle">
+    <!-- daemon detects -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.13;0.16;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <rect x="429" y="212" width="140" height="46" rx="8" fill="#11202e" stroke="#58a6ff" stroke-width="2"/>
+      <text x="499" y="231" fill="#58a6ff" font-size="12" font-weight="700">daemon scan (10 s)</text>
+      <text x="499" y="249" fill="#ff453a" font-size="11" font-family="ui-monospace,Menlo,monospace">ISR=1 &lt; minISR=2</text>
+    </g>
+    <!-- lag check + file edit -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.27;0.31;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <text x="499" y="290" fill="#bf5af2" font-size="11.5" font-weight="700" font-family="ui-monospace,Menlo,monospace">lag=0 ✓ → PROMOTE (audit-logged)</text>
+      <path d="M471,308 h40 l14,14 v42 h-54 z" fill="#241f33" stroke="#d29922" stroke-width="2"/>
+      <text x="498" y="345" fill="#d29922" font-size="12" font-weight="700" font-family="ui-monospace,Menlo,monospace">3→∅</text>
+      <text x="499" y="384" fill="#9fb0c3" font-size="10.5">observer.ids · atomic write, no human</text>
+    </g>
+    <!-- recovery -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.43;0.47;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <text x="499" y="444" fill="#30d158" font-size="15" font-weight="800">✓ writes resume</text>
+    </g>
+    <rect x="372" y="466" width="255" height="48" rx="8" fill="#0d1a2b" stroke="#58a6ff" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.43;0.47;0.98;1" dur="15s" repeatCount="indefinite"/></rect>
+    <text x="499" y="486" fill="#58a6ff" font-size="13" font-weight="800" opacity="0">RTO ≤ 14 s, end to end
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.43;0.47;0.98;1" dur="15s" repeatCount="indefinite"/></text>
+    <text x="499" y="504" fill="#9fb0c3" font-size="10.5" opacity="0">measured: detect ≤10 s + native expand 4–10 s
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.43;0.47;0.98;1" dur="15s" repeatCount="indefinite"/></text>
+  </g>
+
+  <!-- ===== Column 3: HYBRID — daemon detects (dry-run) → human confirms → daemon executes ===== -->
+  <g text-anchor="middle">
+    <!-- daemon detects in dry-run -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.13;0.16;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <rect x="746" y="212" width="140" height="46" rx="8" fill="#122318" stroke="#30d158" stroke-width="2"/>
+      <text x="816" y="231" fill="#30d158" font-size="12" font-weight="700">daemon detects fast</text>
+      <text x="816" y="249" fill="#d29922" font-size="11" font-family="ui-monospace,Menlo,monospace">would PROMOTE 3 (-n)</text>
+    </g>
+    <!-- human confirms -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.33;0.37;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <circle cx="786" cy="298" r="11" fill="none" stroke="#e6edf3" stroke-width="2"/>
+      <path d="M768,332 q18,-20 36,0" fill="none" stroke="#e6edf3" stroke-width="2"/>
+      <text x="846" y="308" fill="#30d158" font-size="18" font-weight="800">✓</text>
+      <text x="816" y="356" fill="#9fb0c3" font-size="11.5" font-weight="700">human reviews the trace, confirms</text>
+    </g>
+    <!-- daemon executes -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.53;0.57;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <rect x="689" y="372" width="255" height="36" rx="6" fill="#1a2332" stroke="#30d158" stroke-width="1.5"/>
+      <text x="816" y="395" fill="#e6edf3" font-size="11.5" font-family="ui-monospace,Menlo,monospace">daemon executes the same plan</text>
+    </g>
+    <!-- recovery -->
+    <g opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.67;0.71;0.93;1" dur="15s" repeatCount="indefinite"/>
+      <text x="816" y="444" fill="#30d158" font-size="15" font-weight="800">✓ writes resume</text>
+    </g>
+    <rect x="689" y="466" width="255" height="48" rx="8" fill="#122318" stroke="#30d158" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.67;0.71;0.98;1" dur="15s" repeatCount="indefinite"/></rect>
+    <text x="816" y="486" fill="#30d158" font-size="13" font-weight="800" opacity="0">detect fast, decide deliberately
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.67;0.71;0.98;1" dur="15s" repeatCount="indefinite"/></text>
+    <text x="816" y="504" fill="#9fb0c3" font-size="10.5" opacity="0">automated eyes + human hands
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.67;0.71;0.98;1" dur="15s" repeatCount="indefinite"/></text>
+  </g>
+
+  <!-- ===== Bottom banner ===== -->
+  <rect x="200" y="556" width="600" height="40" rx="8" fill="#241f33" stroke="#bf5af2" stroke-width="1.5"/>
+  <text x="500" y="581" fill="#bf5af2" font-size="15" font-weight="800" text-anchor="middle">Choose your mode — same file mechanism underneath (observer.ids)</text>
+  <text x="500" y="612" fill="#9fb0c3" font-size="10.5" text-anchor="middle">Switching modes is an operational decision, not a redeploy: the cluster patch and the runbooks never change.</text>
+</svg>
