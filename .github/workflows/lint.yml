@@ -1,0 +1,87 @@
+# =============================================================================
+# lint.yml — static checks for everything that is not the patch itself
+#   - shellcheck on every .sh (operational scripts must be beyond reproach:
+#     they run on production brokers)
+#   - terraform fmt -check (guarded: skips cleanly while terraform/ is empty)
+#   - python syntax (py_compile) on every .py (patch generators / archives)
+# =============================================================================
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: shellcheck (*.sh)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run shellcheck on all shell scripts
+        run: |
+          # shellcheck is preinstalled on ubuntu-latest runners
+          shellcheck --version
+          mapfile -t scripts < <(find . -name "*.sh" -not -path "./.git/*")
+          if [ "${#scripts[@]}" -eq 0 ]; then
+            echo "No shell scripts found."
+            exit 0
+          fi
+          printf 'Checking %d script(s):\n' "${#scripts[@]}"
+          printf '  %s\n' "${scripts[@]}"
+          shellcheck --severity=warning "${scripts[@]}"
+
+  terraform-fmt:
+    name: terraform fmt -check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for Terraform files
+        id: tf
+        run: |
+          if find . -name "*.tf" -not -path "./.git/*" | grep -q .; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No .tf files yet — skipping (terraform/ module planned, see ROADMAP.md)."
+          fi
+
+      - name: Set up Terraform
+        if: steps.tf.outputs.present == 'true'
+        uses: hashicorp/setup-terraform@v3
+
+      - name: terraform fmt -check -recursive
+        if: steps.tf.outputs.present == 'true'
+        run: terraform fmt -check -recursive -diff
+
+  python-syntax:
+    name: python syntax (py_compile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile all Python files
+        run: |
+          mapfile -t pyfiles < <(find . -name "*.py" -not -path "./.git/*")
+          if [ "${#pyfiles[@]}" -eq 0 ]; then
+            echo "No Python files found."
+            exit 0
+          fi
+          printf 'Compiling %d file(s):\n' "${#pyfiles[@]}"
+          printf '  %s\n' "${pyfiles[@]}"
+          python -m py_compile "${pyfiles[@]}"

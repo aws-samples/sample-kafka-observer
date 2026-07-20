@@ -1,0 +1,94 @@
+# =============================================================================
+# build-verify.yml — patch-apply + compile verification across Kafka versions
+#
+# What this proves on every push (and weekly, as a version-drift sentinel):
+#   1. The canonical patch (patches/kafka-3.7.1-zk/observer.patch) applies
+#      cleanly to every supported Kafka version. The five anchor hunks are
+#      verbatim-identical across 3.6.x–3.9.x, so a single patch file covers
+#      the whole ZK-mode range (see docs/multi-version.md).
+#   2. All OBSERVER PATCH markers landed in the source tree (>= 6).
+#   3. The patched :core module actually compiles (compileScala — faster than
+#      :core:jar, catches every Scala-level breakage).
+#
+# If a future Kafka point release moves an anchor, the weekly cron run fails
+# here first — that is the signal to cut a version-specific patch directory
+# (patches/kafka-<version>-zk/observer.patch).
+# =============================================================================
+name: build-verify
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "evidence/**"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "evidence/**"
+  schedule:
+    # Weekly version-drift sentinel: Mondays 03:17 UTC (off-peak, non-zero
+    # minute to avoid the top-of-hour GitHub Actions congestion).
+    - cron: "17 3 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  patch-and-compile:
+    name: "Kafka ${{ matrix.kafka_version }} (ZK mode)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        kafka_version: ["3.6.2", "3.7.1", "3.8.1", "3.9.1"]
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Clone Apache Kafka ${{ matrix.kafka_version }} (shallow)
+        run: |
+          git clone --depth 1 --branch "${{ matrix.kafka_version }}" \
+            https://github.com/apache/kafka.git kafka-src
+
+      - name: Apply canonical observer patch (git apply --3way)
+        working-directory: kafka-src
+        run: |
+          PATCH="$GITHUB_WORKSPACE/patches/kafka-3.7.1-zk/observer.patch"
+          echo "Applying $PATCH to Kafka ${{ matrix.kafka_version }} ..."
+          if ! git apply --3way "$PATCH"; then
+            echo "::error::Canonical patch failed to apply on Kafka ${{ matrix.kafka_version }}."
+            echo "::error::An anchor has drifted in this version. Run tools/check-anchors.sh ${{ matrix.kafka_version }}"
+            echo "::error::to see which anchor moved, then cut a version-specific patch:"
+            echo "::error::  patches/kafka-${{ matrix.kafka_version }}-zk/observer.patch"
+            exit 1
+          fi
+          git status --short
+
+      - name: Verify OBSERVER PATCH markers (>= 6)
+        working-directory: kafka-src
+        run: |
+          MARKERS=$(grep -r "OBSERVER PATCH" core/src/main/scala/ | wc -l | tr -d ' ')
+          echo "OBSERVER PATCH markers found: $MARKERS"
+          if [ "$MARKERS" -lt 6 ]; then
+            echo "::error::Expected >= 6 OBSERVER PATCH markers, found $MARKERS — patch applied incompletely."
+            exit 1
+          fi
+
+      - name: Compile patched :core module (compileScala)
+        working-directory: kafka-src
+        run: ./gradlew :core:compileScala --console=plain --no-daemon
+
+      - name: Report
+        run: |
+          echo "Kafka ${{ matrix.kafka_version }}: patch applies cleanly and :core compiles." >> "$GITHUB_STEP_SUMMARY"
