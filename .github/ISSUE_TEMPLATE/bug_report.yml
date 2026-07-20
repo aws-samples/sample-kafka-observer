@@ -1,0 +1,46 @@
+name: Bug Report
+description: Report a problem with the observer patch or tooling
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: kafka-version
+    attributes:
+      label: Kafka version
+      options:
+        - "3.6.x"
+        - "3.7.x"
+        - "3.8.x"
+        - "3.9.x"
+        - "4.0.x"
+        - "4.1.x"
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - ZooKeeper
+        - KRaft (combined)
+        - KRaft (controller-only + broker-only)
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Include `kafka-topics.sh --describe` output showing Replicas/ISR/observer state
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      render: shell

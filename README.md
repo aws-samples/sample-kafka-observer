@@ -9,7 +9,9 @@
 
 Add a third replica state to open-source Apache Kafka: replicas that **fully sync data but never join the ISR** — so they never drag the high-watermark, never become leader, and can be **promoted to a fully electable replica in seconds, with zero restarts and zero data movement**.
 
-> Every number in this repository was measured on real EC2 instances (Tokyo, 3 brokers across 3 AZs, m7g.large). Evidence files with raw command output are in [`evidence/`](evidence/). How the design emerged across three POC iterations: [docs/design-story.md](docs/design-story.md).
+> Every number in this repository was measured on real EC2 instances (Tokyo, up to 4 brokers + 3 controllers across 3 AZs, m7g.large). Evidence files with raw command output are in [`evidence/`](evidence/). How the design emerged across three POC iterations: [docs/design-story.md](docs/design-story.md).
+
+**Production-recommended topology**: RF4 = 3 ISR members across 3 AZs + 1 observer in a remote AZ/DC. With `min.insync.replicas=2`, losing 1 AZ still leaves ISR ≥ minISR → **writes continue without promotion**. The observer is promoted only when 2+ AZs are lost simultaneously (extreme disaster). This is verified in our scenario matrix (`--replica-assignment 3:1:2:4`, see [evidence](evidence/scenario_matrix_evidence.md)). The minimum verified topology (RF3 = 2 ISR + 1 observer) is also fully tested — see [topology guide](docs/architecture.md#topology-guide).
 
 ## Why this exists
 
