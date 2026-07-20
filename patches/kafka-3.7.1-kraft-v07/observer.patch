@@ -1,0 +1,528 @@
+diff --git a/core/src/main/scala/kafka/cluster/Partition.scala b/core/src/main/scala/kafka/cluster/Partition.scala
+index 0194616..f4dd8bb 100755
+--- a/core/src/main/scala/kafka/cluster/Partition.scala
++++ b/core/src/main/scala/kafka/cluster/Partition.scala
+@@ -158,6 +158,11 @@ object Partition {
+     metricsGroup.removeMetric("ReplicasCount", tags)
+     metricsGroup.removeMetric("LastStableOffsetLag", tags)
+     metricsGroup.removeMetric("AtMinIsr", tags)
++    // === OBSERVER METRICS (v0.7) ===
++    metricsGroup.removeMetric("ObserversInIsrCount", tags)
++    metricsGroup.removeMetric("ObserverCaughtUpCount", tags)
++    metricsGroup.removeMetric("ObserverLagMessages", tags)
++    // === END OBSERVER METRICS ===
+   }
+ }
+ 
+@@ -362,6 +367,15 @@ class Partition(val topicPartition: TopicPartition,
+   metricsGroup.newGauge("ReplicasCount", () => if (isLeader) assignmentState.replicationFactor else 0, tags)
+   metricsGroup.newGauge("LastStableOffsetLag", () => log.map(_.lastStableOffsetLag).getOrElse(0), tags)
+ 
++  // === OBSERVER METRICS (v0.7): per-partition observer gauges (leader 视角, 非 leader 归 0) ===
++  // kafka.cluster:type=Partition,name=ObserversInIsrCount,topic=X,partition=N — 理论恒 0, >0 即告警
++  // kafka.cluster:type=Partition,name=ObserverCaughtUpCount,topic=X,partition=N — 追上 leader 的 observer 数
++  // kafka.cluster:type=Partition,name=ObserverLagMessages,topic=X,partition=N — observer 最大 LEO 落后条数
++  metricsGroup.newGauge("ObserversInIsrCount", () => observersInIsrCount, tags)
++  metricsGroup.newGauge("ObserverCaughtUpCount", () => observerCaughtUpCount, tags)
++  metricsGroup.newGauge("ObserverLagMessages", () => observerMaxLagMessages, tags)
++  // === END OBSERVER METRICS ===
++
+   def hasLateTransaction(currentTimeMs: Long): Boolean = leaderLogIfLocal.exists(_.hasLateTransaction(currentTimeMs))
+ 
+   def isUnderReplicated: Boolean = isLeader && (assignmentState.replicationFactor - partitionState.isr.size) > 0
+@@ -388,6 +402,41 @@ class Partition(val topicPartition: TopicPartition,
+    */
+   def isAtMinIsr: Boolean = leaderLogIfLocal.exists { partitionState.isr.size == effectiveMinIsr(_) }
+ 
++  // === OBSERVER METRICS (v0.7): leader 视角的 observer 指标实现 ===
++  // 只读现有 volatile 状态 (partitionState/remoteReplicas/stateSnapshot), 无锁无额外 IO;
++  // observer 集合判定走 ObserverIds 的 5s 缓存。对标 Confluent kafka-replica-status.sh
++  // 的 isObserver/isCaughtUp/lag 字段。
++
++  /** ISR 中的 observer 数。gate 正常时恒 0; >0 说明 gate 被绕过或 observer.ids 各节点不一致。 */
++  def observersInIsrCount: Int =
++    if (isLeader) partitionState.isr.count(kafka.observer.ObserverIds.isObserver) else 0
++
++  private def observerReplicas: Iterable[Replica] =
++    remoteReplicas.filter(r => kafka.observer.ObserverIds.isObserver(r.brokerId))
++
++  /** 已追上 leader 的 observer 数 (isCaughtUp 语义与 ISR 判定一致: LEO 相等或 lag 时间 <= replica.lag.time.max.ms)。 */
++  def observerCaughtUpCount: Int = {
++    leaderLogIfLocal match {
++      case Some(leaderLog) =>
++        val leaderEndOffset = leaderLog.logEndOffset
++        val currentTimeMs = time.milliseconds()
++        observerReplicas.count(_.stateSnapshot.isCaughtUp(leaderEndOffset, currentTimeMs, replicaLagTimeMaxMs))
++      case None => 0
++    }
++  }
++
++  /** observer 副本中最大的 LEO 落后条数 (leader LEO - observer LEO), 无 observer 或非 leader 时为 0。 */
++  def observerMaxLagMessages: Long = {
++    leaderLogIfLocal match {
++      case Some(leaderLog) =>
++        val leaderEndOffset = leaderLog.logEndOffset
++        val lags = observerReplicas.map(r => math.max(0L, leaderEndOffset - r.stateSnapshot.logEndOffset))
++        if (lags.isEmpty) 0L else lags.max
++      case None => 0L
++    }
++  }
++  // === END OBSERVER METRICS ===
++
+   def isReassigning: Boolean = assignmentState.isInstanceOf[OngoingReassignmentState]
+ 
+   def isAddingLocalReplica: Boolean = assignmentState.isAddingReplica(localBrokerId)
+@@ -1044,6 +1093,13 @@ class Partition(val topicPartition: TopicPartition,
+   }
+ 
+   private def canAddReplicaToIsr(followerReplicaId: Int): Boolean = {
++    // === OBSERVER PATCH v3 === observer 永不进 ISR。列表来自动态文件(5s 缓存, 零重启)。
++    // 晋升: 从 /opt/kafka/observer.ids 删掉该 id → 下次 fetch 触发 maybeExpandIsr 时此处放行
++    //       → 自动进 ISR → 自动恢复 leader 选举候选资格。
++    if (kafka.observer.ObserverIds.isObserver(followerReplicaId)) {
++      return false
++    }
++    // === END OBSERVER PATCH ===
+     val current = partitionState
+     !current.isInflight &&
+       !current.isr.contains(followerReplicaId) &&
+@@ -1176,6 +1232,8 @@ class Partition(val topicPartition: TopicPartition,
+       val replicaState = replica.stateSnapshot
+ 
+       def shouldWaitForReplicaToJoinIsr: Boolean = {
++        // === OBSERVER PATCH v3: HW 推进永不等待 observer (它也永远不会加入 ISR) ===
++        !kafka.observer.ObserverIds.isObserver(replica.brokerId) &&
+         replicaState.isCaughtUp(leaderLogEndOffset.messageOffset, currentTimeMs, replicaLagTimeMaxMs) &&
+         isReplicaIsrEligible(replica.brokerId)
+       }
+@@ -1312,7 +1370,13 @@ class Partition(val topicPartition: TopicPartition,
+       val candidateReplicaIds = current.isr - localBrokerId
+       val currentTimeMs = time.milliseconds()
+       val leaderEndOffset = localLogOrException.logEndOffset
+-      candidateReplicaIds.filter(replicaId => isFollowerOutOfSync(replicaId, leaderEndOffset, currentTimeMs, maxLagMs))
++      val laggingReplicaIds = candidateReplicaIds.filter(replicaId => isFollowerOutOfSync(replicaId, leaderEndOffset, currentTimeMs, maxLagMs))
++      // === OBSERVER PATCH v3: 降级钩子 ===
++      // 已在 ISR 内但被标记为 observer 的副本, 视同 out-of-sync →
++      // 周期性 isr-expiration 任务自动走原生 shrink 流程将其移出 ISR (零重启降级)。
++      // 之后它想回 ISR 会被 canAddReplicaToIsr 拦住, 状态稳定。
++      laggingReplicaIds ++ candidateReplicaIds.filter(kafka.observer.ObserverIds.isObserver)
++      // === END OBSERVER PATCH ===
+     } else {
+       Set.empty
+     }
+diff --git a/core/src/main/scala/kafka/controller/PartitionStateMachine.scala b/core/src/main/scala/kafka/controller/PartitionStateMachine.scala
+index 71b163a..86e04a7 100755
+--- a/core/src/main/scala/kafka/controller/PartitionStateMachine.scala
++++ b/core/src/main/scala/kafka/controller/PartitionStateMachine.scala
+@@ -288,7 +288,11 @@ class ZkPartitionStateMachine(config: KafkaConfig,
+       logFailedStateChange(partition, NewPartition, OnlinePartition, new StateChangeFailedException(failMsg))
+     }
+     val leaderIsrAndControllerEpochs = partitionsWithLiveReplicas.map { case (partition, liveReplicas) =>
+-      val leaderAndIsr = LeaderAndIsr(liveReplicas.head, liveReplicas.toList)
++      // === OBSERVER PATCH v3: 初始 ISR 排除 observer, leader 从非 observer 中选 ===
++      // 兜底: 若存活副本全是 observer, 保留原生行为(宁可可用也不空 ISR)
++      val nonObserver = liveReplicas.filterNot(kafka.observer.ObserverIds.isObserver)
++      val isrReplicas = if (nonObserver.nonEmpty) nonObserver else liveReplicas
++      val leaderAndIsr = LeaderAndIsr(isrReplicas.head, isrReplicas.toList)
+       val leaderIsrAndControllerEpoch = LeaderIsrAndControllerEpoch(leaderAndIsr, controllerContext.epoch)
+       partition -> leaderIsrAndControllerEpoch
+     }.toMap
+@@ -532,7 +536,8 @@ object PartitionLeaderElectionAlgorithms {
+   def offlinePartitionLeaderElection(assignment: Seq[Int], isr: Seq[Int], liveReplicas: Set[Int], uncleanLeaderElectionEnabled: Boolean, controllerContext: ControllerContext): Option[Int] = {
+     assignment.find(id => liveReplicas.contains(id) && isr.contains(id)).orElse {
+       if (uncleanLeaderElectionEnabled) {
+-        val leaderOpt = assignment.find(liveReplicas.contains)
++        // === OBSERVER PATCH v3: unclean 选举也不选 observer (宁可无 leader 不丢一致性) ===
++        val leaderOpt = assignment.find(id => liveReplicas.contains(id) && !kafka.observer.ObserverIds.isObserver(id))
+         if (leaderOpt.isDefined)
+           controllerContext.stats.uncleanLeaderElectionRate.mark()
+         leaderOpt
+diff --git a/core/src/main/scala/kafka/observer/ObserverIds.scala b/core/src/main/scala/kafka/observer/ObserverIds.scala
+new file mode 100644
+index 0000000..6ec0fc5
+--- /dev/null
++++ b/core/src/main/scala/kafka/observer/ObserverIds.scala
+@@ -0,0 +1,99 @@
++package kafka.observer
++
++import java.nio.file.{Files, Path, Paths}
++import com.yammer.metrics.core.Gauge
++import kafka.utils.Logging
++import org.apache.kafka.server.metrics.{KafkaMetricsGroup, KafkaYammerMetrics}
++import scala.jdk.CollectionConverters._
++import scala.util.Try
++import scala.util.control.NonFatal
++
++/**
++ * === OBSERVER PATCH v3 ===
++ * Observer broker id 的动态来源: 本地文件 (默认 /opt/kafka/observer.ids), 带 5 秒缓存。
++ *
++ * 语义:
++ *   - 文件存在: 以文件内容为准 (每行一个或逗号分隔的 broker id; 支持 # 注释; 空文件 = 无 observer)
++ *   - 文件不存在: 回退读环境变量 KAFKA_OBSERVER_BROKER_IDS (兼容 v1/v2 部署)
++ *   - 文件读取失败 (权限/IO 错误): 保留上一次缓存值, 只打 warn 日志, 绝不影响 broker 运行
++ *
++ * 晋升 = 从文件删 id (下次 fetch 触发 maybeExpandIsr 放行, 自动进 ISR);
++ * 降级 = 把 id 加回文件 (getOutOfSyncReplicas 降级钩子把它视同掉队, isr-expiration 自动 shrink)。
++ * 缓存 5 秒: canAddReplicaToIsr 在 fetch 热路径上, 不能每次读盘; 5 秒对运维操作足够实时。
++ */
++object ObserverIds extends Logging {
++
++  private val CacheTtlNanos: Long = 5L * 1000 * 1000 * 1000 // 5s
++
++  @volatile private var cachedIds: Set[Int] = Set.empty
++  @volatile private var lastRefreshNanos: Long = 0L
++  @volatile private var initialized: Boolean = false
++
++  // === OBSERVER METRICS (v0.7) ===
++  // broker 级 JMX gauge: kafka.observer:type=ObserverMetrics,name=ObserverCount
++  // 当前 observer.ids 集合的大小。注册发生在本 object 首次被触碰时 (首个 fetch/ISR 判定);
++  // gauge 读取走 5s 缓存, 不产生额外磁盘 IO。
++  KafkaYammerMetrics.defaultRegistry().newGauge(
++    KafkaMetricsGroup.explicitMetricName("kafka.observer", "ObserverMetrics", "ObserverCount",
++      java.util.Collections.emptyMap[String, String]()),
++    new Gauge[Int] { override def value(): Int = current().size }
++  )
++  // === END OBSERVER METRICS ===
++
++  private def filePath: Path =
++    Paths.get(Option(System.getenv("KAFKA_OBSERVER_IDS_FILE")).getOrElse("/opt/kafka/observer.ids"))
++
++  // 兼容 v1/v2: 文件不存在时回退环境变量
++  // Try(...).toOption 而非 toIntOption: 兼容 Scala 2.12/2.13 双构建
++  private def envFallback: Set[Int] =
++    Option(System.getenv("KAFKA_OBSERVER_BROKER_IDS")).getOrElse("")
++      .split(",").iterator.map(_.trim).filter(_.nonEmpty)
++      .flatMap(s => Try(s.toInt).toOption).toSet
++
++  // OBSERVER METRICS (v0.7): 返回 (集合, 来源) — 来源进审计日志
++  private def readFromFile(): (Set[Int], String) = {
++    val p = filePath
++    if (!Files.exists(p)) {
++      (envFallback, "env:KAFKA_OBSERVER_BROKER_IDS")
++    } else {
++      val ids = Files.readAllLines(p).asScala.iterator
++        .filterNot(_.trim.startsWith("#"))          // 整行注释
++        .flatMap(_.split("[,\\s]+"))                 // 逗号/空白分隔
++        .map(_.trim)
++        .filter(_.nonEmpty)
++        .flatMap(s => Try(s.toInt).toOption)         // 非数字 token 静默忽略
++        .toSet
++      (ids, s"file:$p")
++    }
++  }
++
++  /** 当前 observer 集合 (5s 缓存)。任何异常都不外抛。 */
++  def current(): Set[Int] = {
++    val now = System.nanoTime()
++    // now - lastRefreshNanos 用减法比较, 对 nanoTime 回绕安全; 首次调用必刷新
++    if (!initialized || now - lastRefreshNanos >= CacheTtlNanos) {
++      try {
++        val (fresh, source) = readFromFile()
++        if (fresh != cachedIds) {
++          // === OBSERVER METRICS (v0.7): 结构化审计行 ===
++          // WARN 级别保证默认 log4j 配置下可见; before/after/added/removed/source/epochMs
++          // 全量记录, 晋升(removed)与降级(added)操作均可事后审计。
++          def fmt(s: Set[Int]): String = s.toList.sorted.mkString("[", ",", "]")
++          warn(s"OBSERVER AUDIT (broker): observer id set changed " +
++            s"before=${fmt(cachedIds)} after=${fmt(fresh)} " +
++            s"added=${fmt(fresh -- cachedIds)} removed=${fmt(cachedIds -- fresh)} " +
++            s"source=$source epochMs=${System.currentTimeMillis()}")
++        }
++        cachedIds = fresh
++      } catch {
++        case NonFatal(e) =>
++          warn(s"Failed to read observer ids from $filePath, keeping last value $cachedIds", e)
++      }
++      lastRefreshNanos = now
++      initialized = true
++    }
++    cachedIds
++  }
++
++  def isObserver(brokerId: Int): Boolean = current().contains(brokerId)
++}
+diff --git a/core/src/main/scala/kafka/server/ReplicaManager.scala b/core/src/main/scala/kafka/server/ReplicaManager.scala
+index d46ca67..ea51314 100644
+--- a/core/src/main/scala/kafka/server/ReplicaManager.scala
++++ b/core/src/main/scala/kafka/server/ReplicaManager.scala
+@@ -24,7 +24,7 @@ import kafka.log.remote.RemoteLogManager
+ import kafka.log.{LogManager, UnifiedLog}
+ import kafka.server.HostedPartition.Online
+ import kafka.server.QuotaFactory.QuotaManagers
+-import kafka.server.ReplicaManager.{AtMinIsrPartitionCountMetricName, FailedIsrUpdatesPerSecMetricName, IsrExpandsPerSecMetricName, IsrShrinksPerSecMetricName, LeaderCountMetricName, OfflineReplicaCountMetricName, PartitionCountMetricName, PartitionsWithLateTransactionsCountMetricName, ProducerIdCountMetricName, ReassigningPartitionsMetricName, UnderMinIsrPartitionCountMetricName, UnderReplicatedPartitionsMetricName, createLogReadResult}
++import kafka.server.ReplicaManager.{AtMinIsrPartitionCountMetricName, FailedIsrUpdatesPerSecMetricName, IsrExpandsPerSecMetricName, IsrShrinksPerSecMetricName, LeaderCountMetricName, ObserverCaughtUpCountMetricName, ObserverLagMessagesMetricName, ObserversInIsrCountMetricName, OfflineReplicaCountMetricName, PartitionCountMetricName, PartitionsWithLateTransactionsCountMetricName, ProducerIdCountMetricName, ReassigningPartitionsMetricName, UnderMinIsrPartitionCountMetricName, UnderReplicatedPartitionsMetricName, createLogReadResult}
+ import kafka.server.checkpoints.{LazyOffsetCheckpoints, OffsetCheckpointFile, OffsetCheckpoints}
+ import kafka.server.metadata.ZkMetadataCache
+ import kafka.utils.Implicits._
+@@ -199,6 +199,11 @@ object ReplicaManager {
+   private val ReassigningPartitionsMetricName = "ReassigningPartitions"
+   private val PartitionsWithLateTransactionsCountMetricName = "PartitionsWithLateTransactionsCount"
+   private val ProducerIdCountMetricName = "ProducerIdCount"
++  // === OBSERVER METRICS (v0.7): broker 级 observer 聚合指标名 ===
++  private val ObserversInIsrCountMetricName = "ObserversInIsrCount"
++  private val ObserverCaughtUpCountMetricName = "ObserverCaughtUpCount"
++  private val ObserverLagMessagesMetricName = "ObserverLagMessages"
++  // === END OBSERVER METRICS ===
+   private val IsrExpandsPerSecMetricName = "IsrExpandsPerSec"
+   private val IsrShrinksPerSecMetricName = "IsrShrinksPerSec"
+   private val FailedIsrUpdatesPerSecMetricName = "FailedIsrUpdatesPerSec"
+@@ -212,7 +217,12 @@ object ReplicaManager {
+     AtMinIsrPartitionCountMetricName,
+     ReassigningPartitionsMetricName,
+     PartitionsWithLateTransactionsCountMetricName,
+-    ProducerIdCountMetricName
++    ProducerIdCountMetricName,
++    // === OBSERVER METRICS (v0.7): 纳入 GaugeMetricNames, removeMetrics 时自动清理 ===
++    ObserversInIsrCountMetricName,
++    ObserverCaughtUpCountMetricName,
++    ObserverLagMessagesMetricName
++    // === END OBSERVER METRICS ===
+   )
+ 
+   private[server] val MeterMetricNames = Set(
+@@ -339,6 +349,14 @@ class ReplicaManager(val config: KafkaConfig,
+   metricsGroup.newGauge(ReassigningPartitionsMetricName, () => reassigningPartitionsCount)
+   metricsGroup.newGauge(PartitionsWithLateTransactionsCountMetricName, () => lateTransactionsCount)
+   metricsGroup.newGauge(ProducerIdCountMetricName, () => producerIdCount)
++  // === OBSERVER METRICS (v0.7): broker 级聚合 (本 broker 为 leader 的分区上聚合 observer 状态) ===
++  // kafka.server:type=ReplicaManager,name=ObserversInIsrCount — 理论恒 0; >0 = gate 被绕过/文件不一致, 最高价值告警
++  // kafka.server:type=ReplicaManager,name=ObserverCaughtUpCount — 各分区已追上的 observer 副本计数之和
++  // kafka.server:type=ReplicaManager,name=ObserverLagMessages — 各分区 observer 最大落后条数的总和
++  metricsGroup.newGauge(ObserversInIsrCountMetricName, () => leaderPartitionsIterator.map(_.observersInIsrCount).sum)
++  metricsGroup.newGauge(ObserverCaughtUpCountMetricName, () => leaderPartitionsIterator.map(_.observerCaughtUpCount).sum)
++  metricsGroup.newGauge(ObserverLagMessagesMetricName, () => leaderPartitionsIterator.map(_.observerMaxLagMessages).sum)
++  // === END OBSERVER METRICS ===
+ 
+   def reassigningPartitionsCount: Int = leaderPartitionsIterator.count(_.isReassigning)
+ 
+diff --git a/metadata/src/main/java/org/apache/kafka/controller/ObserverReplicas.java b/metadata/src/main/java/org/apache/kafka/controller/ObserverReplicas.java
+new file mode 100644
+index 0000000..bb29fa2
+--- /dev/null
++++ b/metadata/src/main/java/org/apache/kafka/controller/ObserverReplicas.java
+@@ -0,0 +1,178 @@
++/*
++ * Licensed to the Apache Software Foundation (ASF) under one or more
++ * contributor license agreements. See the NOTICE file distributed with
++ * this work for additional information regarding copyright ownership.
++ * The ASF licenses this file to You under the Apache License, Version 2.0
++ * (the "License"); you may not use this file except in compliance with
++ * the License. You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++package org.apache.kafka.controller;
++
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.nio.file.Paths;
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.HashSet;
++import java.util.List;
++import java.util.Set;
++
++/**
++ * === OBSERVER PATCH (KRaft controller side) ===
++ * Controller-side source of observer broker ids. Same file format and semantics as
++ * kafka.observer.ObserverIds (core, ZK/broker side), but pure Java because the
++ * metadata module must not depend on core.
++ *
++ * Semantics:
++ *   - File (default /opt/kafka/observer.ids, override via KAFKA_OBSERVER_IDS_FILE):
++ *     one id per line or comma/whitespace separated; '#' full-line comments; empty file = no observers.
++ *   - File missing: fall back to env KAFKA_OBSERVER_BROKER_IDS.
++ *   - Read failure (IO/permission): keep last cached value, WARN only — never throws.
++ *   - 5s time-based cache: called from quorum controller event thread on topic creation,
++ *     leader election and AlterPartition; must not hit the disk on every call.
++ *
++ * KRaft deployment note: this file must be present on ALL controller nodes
++ * (the controller quorum may run on machines separate from brokers).
++ */
++final class ObserverReplicas {
++    private static final Logger log = LoggerFactory.getLogger(ObserverReplicas.class);
++
++    private static final long CACHE_TTL_NANOS = 5L * 1000 * 1000 * 1000; // 5s
++
++    private static volatile Set<Integer> cachedIds = Collections.emptySet();
++    private static volatile long lastRefreshNanos = 0L;
++    private static volatile boolean initialized = false;
++
++    private ObserverReplicas() { }
++
++    private static Path filePath() {
++        String p = System.getenv("KAFKA_OBSERVER_IDS_FILE");
++        return Paths.get(p == null ? "/opt/kafka/observer.ids" : p);
++    }
++
++    // Compatibility with v1/v2 deployments: env fallback when file is absent.
++    private static Set<Integer> envFallback() {
++        String env = System.getenv("KAFKA_OBSERVER_BROKER_IDS");
++        Set<Integer> ids = new HashSet<>();
++        if (env != null) {
++            for (String tok : env.split(",")) {
++                String t = tok.trim();
++                if (!t.isEmpty()) {
++                    try {
++                        ids.add(Integer.parseInt(t));
++                    } catch (NumberFormatException ignored) {
++                        // non-numeric tokens silently ignored, same as ObserverIds.scala
++                    }
++                }
++            }
++        }
++        return ids;
++    }
++
++    // === OBSERVER METRICS (v0.7): 审计需要区分来源, 读取时同时记录 source ===
++    private static volatile String lastSource = "unset";
++
++    private static Set<Integer> readFromFile() throws java.io.IOException {
++        Path p = filePath();
++        if (!Files.exists(p)) {
++            lastSource = "env:KAFKA_OBSERVER_BROKER_IDS";
++            return envFallback();
++        }
++        lastSource = "file:" + p;
++        Set<Integer> ids = new HashSet<>();
++        for (String line : Files.readAllLines(p)) {
++            if (line.trim().startsWith("#")) continue;   // full-line comment
++            for (String tok : line.split("[,\\s]+")) {
++                String t = tok.trim();
++                if (!t.isEmpty()) {
++                    try {
++                        ids.add(Integer.parseInt(t));
++                    } catch (NumberFormatException ignored) {
++                        // non-numeric tokens silently ignored
++                    }
++                }
++            }
++        }
++        return ids;
++    }
++
++    /** Current observer id set (5s cache). Never throws. */
++    static Set<Integer> current() {
++        long now = System.nanoTime();
++        // subtraction comparison is safe against nanoTime wraparound; first call always refreshes
++        if (!initialized || now - lastRefreshNanos >= CACHE_TTL_NANOS) {
++            try {
++                Set<Integer> fresh = readFromFile();
++                if (!fresh.equals(cachedIds)) {
++                    // === OBSERVER METRICS (v0.7): 结构化审计行 (WARN 保证默认可见) ===
++                    // before/after/added/removed/source/epochMs 全量记录, 与 broker 侧
++                    // ObserverIds.scala 的 "OBSERVER AUDIT (broker)" 行成对, 可关联审计。
++                    Set<Integer> added = new HashSet<>(fresh);
++                    added.removeAll(cachedIds);
++                    Set<Integer> removed = new HashSet<>(cachedIds);
++                    removed.removeAll(fresh);
++                    log.warn("OBSERVER AUDIT (controller): observer id set changed "
++                        + "before={} after={} added={} removed={} source={} epochMs={}",
++                        sorted(cachedIds), sorted(fresh), sorted(added), sorted(removed),
++                        lastSource, System.currentTimeMillis());
++                }
++                cachedIds = Collections.unmodifiableSet(fresh);
++            } catch (Exception e) {
++                log.warn("Failed to read observer ids from {}, keeping last value {}",
++                    filePath(), cachedIds, e);
++            }
++            lastRefreshNanos = now;
++            initialized = true;
++        }
++        return cachedIds;
++    }
++
++    // OBSERVER METRICS (v0.7): 审计行用的稳定排序输出
++    private static List<Integer> sorted(Set<Integer> ids) {
++        List<Integer> list = new ArrayList<>(ids);
++        Collections.sort(list);
++        return list;
++    }
++
++    static boolean isObserver(int brokerId) {
++        return current().contains(brokerId);
++    }
++
++    /**
++     * Filter observers out of an initial ISR (topic creation / partition creation).
++     * If ALL members are observers, keep the original ISR — a new partition must have
++     * a leader — and WARN loudly (misconfiguration: whole assignment marked observer).
++     */
++    static List<Integer> filterInitialIsr(List<Integer> isr) {
++        Set<Integer> observers = current();
++        if (observers.isEmpty()) {
++            return isr;
++        }
++        List<Integer> filtered = new ArrayList<>(isr.size());
++        for (Integer brokerId : isr) {
++            if (!observers.contains(brokerId)) {
++                filtered.add(brokerId);
++            }
++        }
++        if (filtered.isEmpty()) {
++            log.warn("All replicas in initial ISR {} are observers {}; keeping original ISR " +
++                "so the partition has a leader. Check observer configuration.", isr, observers);
++            return isr;
++        }
++        if (filtered.size() != isr.size()) {
++            log.info("Filtered observers {} from initial ISR {} -> {}", observers, isr, filtered);
++        }
++        return filtered;
++    }
++}
+diff --git a/metadata/src/main/java/org/apache/kafka/controller/ReplicationControlManager.java b/metadata/src/main/java/org/apache/kafka/controller/ReplicationControlManager.java
+index 759e3df..1ce371e 100644
+--- a/metadata/src/main/java/org/apache/kafka/controller/ReplicationControlManager.java
++++ b/metadata/src/main/java/org/apache/kafka/controller/ReplicationControlManager.java
+@@ -824,11 +824,14 @@ public class ReplicationControlManager {
+         PartitionAssignment partitionAssignment,
+         List<Integer> isr
+     ) {
++        // OBSERVER PATCH: observers never join the initial ISR (and thus never start as leader).
++        // If filtering would empty the ISR, the original one is kept (see filterInitialIsr).
++        List<Integer> effectiveIsr = ObserverReplicas.filterInitialIsr(isr);
+         return new PartitionRegistration.Builder().
+             setReplicas(Replicas.toArray(partitionAssignment.replicas())).
+             setDirectories(Uuid.toArray(partitionAssignment.directories())).
+-            setIsr(Replicas.toArray(isr)).
+-            setLeader(isr.get(0)).
++            setIsr(Replicas.toArray(effectiveIsr)).
++            setLeader(effectiveIsr.get(0)).
+             setLeaderRecoveryState(LeaderRecoveryState.RECOVERED).
+             setLeaderEpoch(0).
+             setPartitionEpoch(0).
+@@ -1260,7 +1263,11 @@ public class ReplicationControlManager {
+         for (BrokerState brokerState : brokerStates) {
+             int brokerId = brokerState.brokerId();
+             BrokerRegistration registration = clusterControl.registration(brokerId);
+-            if (registration == null) {
++            // OBSERVER PATCH: second line of defense — the broker-side gate normally prevents
++            // this, but if a leader ever proposes an observer for the ISR, reject it here.
++            if (ObserverReplicas.isObserver(brokerId)) {
++                ineligibleReplicas.add(new IneligibleReplica(brokerId, "observer"));
++            } else if (registration == null) {
+                 ineligibleReplicas.add(new IneligibleReplica(brokerId, "not registered"));
+             } else if (registration.inControlledShutdown()) {
+                 ineligibleReplicas.add(new IneligibleReplica(brokerId, "shutting down"));
+@@ -2272,6 +2279,11 @@ public class ReplicationControlManager {
+ 
+         @Override
+         public boolean test(int brokerId) {
++            // OBSERVER PATCH: an observer is never an acceptable leader, covering every
++            // election entry point (clean, unclean, preferred, controlled shutdown, ...).
++            if (ObserverReplicas.isObserver(brokerId)) {
++                return false;
++            }
+             if (!isAcceptableLeader.test(brokerId)) {
+                 return false;
+             }

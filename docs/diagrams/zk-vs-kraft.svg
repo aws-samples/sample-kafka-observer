@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+  <!-- ZK vs KRaft: controller-side hooks differ, broker-side hooks are shared -->
+  <defs>
+    <marker id="karrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/>
+    </marker>
+    <marker id="karrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3fb950"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1000" height="620" rx="12" fill="#1a2332"/>
+  <text x="30" y="40" fill="#e6edf3" font-size="20" font-weight="700">ZooKeeper vs KRaft — same broker-side gates, different controller-side hooks</text>
+  <text x="30" y="62" fill="#9fb0c3" font-size="12.5">The broker data plane (Partition.scala) is identical in both modes. Only the control plane differs: 2 Scala hooks in the ZK controller vs 3 Java hooks in the KRaft quorum controller.</text>
+
+  <!-- Shared broker-side block (center) -->
+  <g>
+    <rect x="300" y="90" width="400" height="200" rx="10" fill="#223044" stroke="#d29922" stroke-width="2"/>
+    <text x="500" y="116" fill="#d29922" font-size="14" font-weight="700" text-anchor="middle">Broker side — shared by BOTH modes</text>
+    <text x="500" y="134" fill="#9fb0c3" font-size="11" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">core/…/cluster/Partition.scala + kafka.observer.ObserverIds</text>
+
+    <rect x="320" y="148" width="360" height="38" rx="6" fill="#1a2332" stroke="#3d4f66"/>
+    <text x="334" y="164" fill="#e6edf3" font-size="11" font-weight="600" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">canAddReplicaToIsr()</text>
+    <text x="334" y="179" fill="#9fb0c3" font-size="10">core gate — observer never joins ISR via maybeExpandIsr</text>
+
+    <rect x="320" y="192" width="360" height="38" rx="6" fill="#1a2332" stroke="#3d4f66"/>
+    <text x="334" y="208" fill="#e6edf3" font-size="11" font-weight="600" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">getOutOfSyncReplicas()</text>
+    <text x="334" y="223" fill="#9fb0c3" font-size="10">demotion — isr-expiration task shrinks an in-ISR observer out</text>
+
+    <rect x="320" y="236" width="360" height="38" rx="6" fill="#1a2332" stroke="#3d4f66"/>
+    <text x="334" y="252" fill="#e6edf3" font-size="11" font-weight="600" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">maybeIncrementLeaderHW()</text>
+    <text x="334" y="267" fill="#9fb0c3" font-size="10">HW gate — "never drags HW" is structural, not just empirical</text>
+  </g>
+
+  <!-- pulsing connectors from shared block to both sides -->
+  <path id="zline" d="M300,190 L230,330" stroke="#58a6ff" stroke-width="2" fill="none" marker-end="url(#karrB)" stroke-dasharray="6 4">
+    <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1.2s" repeatCount="indefinite"/>
+  </path>
+  <path id="kline" d="M700,190 L770,330" stroke="#3fb950" stroke-width="2" fill="none" marker-end="url(#karrG)" stroke-dasharray="6 4">
+    <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1.2s" repeatCount="indefinite"/>
+  </path>
+  <text x="216" y="268" fill="#58a6ff" font-size="10.5" font-weight="600">+ ZK controller hooks</text>
+  <text x="656" y="268" fill="#3fb950" font-size="10.5" font-weight="600">+ KRaft controller hooks</text>
+
+  <!-- Left: ZK controller -->
+  <g>
+    <rect x="30" y="330" width="440" height="230" rx="10" fill="#20293a" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="46" y="356" fill="#58a6ff" font-size="14" font-weight="700">ZooKeeper mode — controller broker (Scala)</text>
+    <text x="46" y="374" fill="#9fb0c3" font-size="10.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">core/…/controller/PartitionStateMachine.scala</text>
+
+    <rect x="46" y="388" width="408" height="52" rx="6" fill="#1a2332" stroke="#3d4f66"/>
+    <text x="60" y="406" fill="#e6edf3" font-size="11" font-weight="600" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">initializeLeaderAndIsrForPartitions</text>
+    <text x="60" y="421" fill="#9fb0c3" font-size="10">topic creation stuffs ALL live replicas into initial ISR (bypasses</text>
+    <text x="60" y="434" fill="#9fb0c3" font-size="10">maybeExpandIsr) → filter observers, pick leader from non-observers</text>
+
+    <rect x="46" y="448" width="408" height="52" rx="6" fill="#1a2332" stroke="#3d4f66"/>
+    <text x="60" y="466" fill="#e6edf3" font-size="11" font-weight="600" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">offlinePartitionLeaderElection (unclean branch)</text>
+    <text x="60" y="481" fill="#9fb0c3" font-size="10">even with unclean.leader.election=true and all ISR dead, never</text>
+    <text x="60" y="494" fill="#9fb0c3" font-size="10">elect an observer → verified: kill all ISR → Leader: none</text>
+
+    <text x="46" y="526" fill="#9fb0c3" font-size="10.5">Patch: <tspan font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#e6edf3">patches/kafka-3.7.1-zk</tspan> — 2 controller hooks, Scala only</text>
+    <text x="46" y="544" fill="#9fb0c3" font-size="10.5">Quirk: new topics — running observer never receives the assignment; restart it once</text>
+  </g>
+
+  <!-- Right: KRaft controller -->
+  <g>
+    <rect x="530" y="330" width="440" height="230" rx="10" fill="#20293a" stroke="#3fb950" stroke-width="1.5"/>
+    <text x="546" y="356" fill="#3fb950" font-size="14" font-weight="700">KRaft mode — quorum controller (Java)</text>
+    <text x="546" y="374" fill="#9fb0c3" font-size="10.5" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">metadata/…/controller/ReplicationControlManager.java + ObserverReplicas.java</text>
+
+    <rect x="546" y="388" width="408" height="38" rx="6" fill="#1a2332" stroke="#3d4f66"/>
+    <text x="560" y="404" fill="#e6edf3" font-size="11" font-weight="600" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">buildPartitionRegistration</text>
+    <text x="560" y="419" fill="#9fb0c3" font-size="10">filter observers from initial ISR (all 3 create/expand call sites)</text>
+
+    <rect x="546" y="432" width="408" height="38" rx="6" fill="#1a2332" stroke="#3d4f66"/>
+    <text x="560" y="448" fill="#e6edf3" font-size="11" font-weight="600" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">LeaderAcceptor.test → isObserver? return false</text>
+    <text x="560" y="463" fill="#9fb0c3" font-size="10">ONE line covers all 7 election entry points (unclean, preferred, reassign…)</text>
+
+    <rect x="546" y="476" width="408" height="38" rx="6" fill="#1a2332" stroke="#3d4f66"/>
+    <text x="560" y="492" fill="#e6edf3" font-size="11" font-weight="600" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">ineligibleReplicasForIsr → INELIGIBLE_REPLICA</text>
+    <text x="560" y="507" fill="#9fb0c3" font-size="10">reject observers in AlterPartition — defense-in-depth</text>
+
+    <text x="546" y="536" fill="#9fb0c3" font-size="10.5">Patch: <tspan font-family="ui-monospace,SFMono-Regular,Menlo,monospace" fill="#e6edf3">kafka-3.7.1-kraft / 4.0.0 / 4.1.0</tspan> — deploy metadata jar on controllers too</text>
+    <text x="546" y="554" fill="#9fb0c3" font-size="10.5">Bonus: no new-topic quirk (brokers learn assignments from the metadata log) · ELR-safe</text>
+  </g>
+
+  <!-- footer -->
+  <text x="30" y="596" fill="#5b6b80" font-size="10">Both control planes read the same /opt/kafka/observer.ids (broker: kafka.observer.ObserverIds, 5 s TTL · controller: org.apache.kafka.controller.ObserverReplicas, mtime cache). Verified: ZK 3.6.2–3.9.1, KRaft 3.7.1 / 4.0.0 / 4.1.0.</text>
+</svg>

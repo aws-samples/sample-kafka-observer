@@ -1,7 +1,7 @@
 # FAQ
 
 **Q: How does this relate to KIP-966 (Eligible Leader Replicas)?**
-KIP-966 is upstream's own admission that "ISR membership" and "leader eligibility" should be separable — the same conceptual direction as observers. But ELR solves election *safety* (avoiding data loss on unclean election), not the observer use case (a replica that syncs without affecting latency). The two compose: our source analysis shows observers never enter ISR ⇒ never enter ELR (`maybePopulateTargetElr` candidates = current ELR ∪ current ISR), so the designs don't conflict. ELR is default-off through 4.0; new 4.1+ clusters enable it, and our v0.5 test matrix covers that combination.
+KIP-966 is upstream's own admission that "ISR membership" and "leader eligibility" should be separable — the same conceptual direction as observers. But ELR solves election *safety* (avoiding data loss on unclean election), not the observer use case (a replica that syncs without affecting latency). The two compose: observers never enter ISR ⇒ never enter ELR (`maybePopulateTargetElr` candidates = current ELR ∪ current ISR), so the designs don't conflict — verified on real clusters on both 4.0 (ELR manually enabled) and 4.1 (ELR default-on), see [evidence](../evidence/elr_verification_evidence.md).
 
 **Q: Why not wait for upstream?**
 There is no upstream observer KIP with content. KIP-929 "Observer Replicas" exists as a wiki page with a **zero-length body** (verified via Confluence API) — a placeholder, not a plan. Users who need this capability today have three options: buy Confluent MRC, fork, or use a maintained patch set like this one.
@@ -25,4 +25,4 @@ The broker keeps running. The loader treats a missing file as "fall back to the 
 Yes — the file takes multiple ids. Typical layouts: fast-pair primaries + one observer in a third AZ; 3-AZ primaries + a remote-site observer; several observers where promotion picks the least-lagged. Promotion choice is explicit (an operator decision), not automatic.
 
 **Q: ZooKeeper mode or KRaft?**
-Both are supported (asymmetric strategy): ZK mode is the verified v0.3 for existing fleets; KRaft is the mainline from v0.5. Broker-side hooks are probe-verified working on KRaft already; the controller-side port (~70 lines of Java) is designed and scheduled. Observer semantics, file format, and runbooks are identical across modes, so the capability survives a ZK→KRaft migration with no gap. See [multi-version.md](multi-version.md).
+Both are supported (asymmetric strategy): ZK mode is the verified v0.3 for existing fleets; KRaft is the mainline — fully verified since v0.5 (broker-side hooks plus a controller-side Java patch in the `metadata` module), extended to Kafka 4.0/4.1 in v0.6. Observer semantics, file format, and runbooks are identical across modes, so the capability survives a ZK→KRaft migration with no gap. See [multi-version.md](multi-version.md).

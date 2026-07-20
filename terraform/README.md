@@ -80,7 +80,7 @@ copy `kafka_2.13-3.7.1.jar` (+ storage jar) to the brokers, write
 | `instance_type` | `m7g.large` | Brokers (arm64 only — AMI is AL2023 arm64) |
 | `loadgen_instance_type` | `""` = same as brokers | Tip: `m7g.xlarge` builds the patched jar in ~1 min |
 | `kafka_version` | `3.7.1` | Vanilla binary pre-downloaded on every node |
-| `mode` | `zk` | `zk` today; `kraft` reserved for patch v0.5 (infra identical) |
+| `mode` | `zk` | `zk` or `kraft` (infra identical — the mode only changes how you configure/start Kafka on the nodes) |
 | `az_ids` | `[]` = first 3 AZs | Pin exact AZ IDs, e.g. `["apne1-az1","apne1-az2","apne1-az4"]` |
 | `use_default_vpc` | `false` | `true` reuses the region's default VPC/subnets |
 | `my_ip` | `""` = auto-detect | Public IPv4 allowed to SSH |

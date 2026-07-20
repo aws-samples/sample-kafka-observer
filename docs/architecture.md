@@ -1,5 +1,9 @@
 # Architecture — how ~60 lines give Kafka a third replica state
 
+<p align="center">
+  <img src="diagrams/architecture.svg" alt="Global architecture — 3 AZs, leader + ISR follower + observer; HW advances on ISR replicas only" width="100%">
+</p>
+
 ## The bookkeeping-team analogy
 
 Think of a Kafka partition as a bookkeeping team:
@@ -31,6 +35,10 @@ We invented **no new mechanism**. We installed gates on existing conveyor belts.
 
 ## The 5 hook points (Kafka 3.7.1, ZooKeeper mode)
 
+<p align="center">
+  <img src="diagrams/zk-vs-kraft.svg" alt="ZooKeeper vs KRaft — shared broker-side hooks in Partition.scala, mode-specific controller hooks" width="100%">
+</p>
+
 | # | Location | Belt we gate | Purpose |
 |---|---|---|---|
 | 1 | `Partition.canAddReplicaToIsr` | Every follower fetch → leader asks "may this replica join ISR?" (`maybeExpandIsr`) | **The core gate.** Observer id in list → `return false` → never joins ISR |
@@ -49,6 +57,14 @@ We invented **no new mechanism**. We installed gates on existing conveyor belts.
 - **Fail-safe**: unreadable/corrupt file → keep last cached value + WARN; the broker never fails to start because of this file
 
 ## Promotion & demotion — reusing native conveyor belts
+
+<p align="center">
+  <img src="diagrams/promotion-flow.svg" alt="Promotion sequence — file edit, 5 s cache refresh, fetch triggers maybeExpandIsr, canAddReplicaToIsr opens, AlterPartition, ISR expands, election eligibility restored" width="100%">
+</p>
+
+<p align="center">
+  <img src="diagrams/demotion-flow.svg" alt="Demotion sequence — id written back, isr-expiration task, getOutOfSyncReplicas hook, native shrink, out of ISR" width="100%">
+</p>
 
 **Promotion** (observer → electable): delete the id from the file. Within 5 s (cache TTL) + one fetch round-trip (≤500 ms under traffic), the gate at #1 opens, the native `maybeExpandIsr → AlterPartition` flow adds it to ISR, and it automatically regains election eligibility. **Measured: ≤10 s, zero restart, zero data movement** — its log was byte-identical all along.
 

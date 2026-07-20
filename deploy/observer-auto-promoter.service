@@ -1,0 +1,52 @@
+# =============================================================================
+# observer-auto-promoter.service — systemd unit TEMPLATE (NOT enabled by default)
+#
+# ⚠️  The auto-promotion policy is OFF by default and this unit is shipped as a
+#     template only. For financial workloads the recommended posture is MANUAL
+#     operation via scripts/observer-promote.sh / observer-demote.sh, following
+#     docs/runbooks/. Read docs/auto-promotion.md (risk statement + enable SOP)
+#     before installing this unit.
+#
+# Install (deliberate, multi-step — no one-liner on purpose):
+#   1. Edit the ExecStart line below: bootstrap servers, broker hosts, options.
+#   2. Validate first in dry-run:   add -n to ExecStart, watch the audit log.
+#   3. sudo cp deploy/observer-auto-promoter.service /etc/systemd/system/
+#   4. sudo systemctl daemon-reload
+#   5. sudo systemctl start observer-auto-promoter     # start WITHOUT enable
+#   6. Only after observing several correct decisions:
+#      sudo systemctl enable observer-auto-promoter
+#
+# Kill switch: sudo systemctl stop observer-auto-promoter   (takes effect at
+# the next scan boundary; in-flight promote/demote completes atomically).
+# =============================================================================
+[Unit]
+Description=Kafka observer auto-promoter (under-min-isr policy, external watchdog)
+Documentation=file:///opt/sample-kafka-observer/docs/auto-promotion.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# -e is the explicit enable interlock: without it the script exits immediately.
+# EDIT bootstrap (-s), broker hosts (-H) and options before installing.
+ExecStart=/opt/sample-kafka-observer/scripts/observer-auto-promoter.sh \
+    -e \
+    -s broker1:9092 \
+    -H "broker1 broker2 broker3 broker4" \
+    -f /opt/kafka/observer.ids \
+    -i 10 \
+    -c 300 \
+    -L /var/log/observer-promoter.log \
+    -S /var/lib/observer-promoter
+Environment=KAFKA_BIN=/opt/kafka/bin
+# Needs ssh to broker hosts (file updates) — run as the same operations user
+# that runs the manual promote/demote runbooks, NOT root.
+User=ec2-user
+Restart=on-failure
+RestartSec=30
+# Audit log + state dir must be writable by User=
+LogsDirectory=observer-promoter
+StateDirectory=observer-promoter
+
+[Install]
+WantedBy=multi-user.target

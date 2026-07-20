@@ -1,12 +1,30 @@
 # sample-kafka-observer
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![CI](https://img.shields.io/badge/CI-build--verify%20%C3%97%207%20Kafka%20versions-success)](.github/workflows/build-verify.yml)
+[![Version](https://img.shields.io/badge/release-v0.6.0-informational)](CHANGELOG.md)
+[![Kafka](https://img.shields.io/badge/Kafka-3.6%20%E2%80%93%204.1%20%C2%B7%20ZK%20%2B%20KRaft-231F20?logo=apachekafka)](docs/multi-version.md)
+
 **Observer/Learner replicas for Apache Kafka — an open reference implementation.**
 
 Add a third replica state to open-source Apache Kafka: replicas that **fully sync data but never join the ISR** — so they never drag the high-watermark, never become leader, and can be **promoted to a fully electable replica in seconds, with zero restarts and zero data movement**.
 
-This is the capability known commercially as Confluent Multi-Region Clusters (MRC) *Observers*, and internally at some large tech companies as *Learner* replicas. Apache Kafka upstream has no equivalent (KIP-929 is an empty placeholder). This project is a minimal, auditable, reproducible implementation — **~60 lines of Scala across 5 hook points**, all reusing Kafka's native ISR expansion/shrink machinery.
+> Every number in this repository was measured on real EC2 instances (Tokyo, 3 brokers across 3 AZs, m7g.large). Evidence files with raw command output are in [`evidence/`](evidence/). How the design emerged across three POC iterations: [docs/design-story.md](docs/design-story.md).
 
-> Every number in this repository was measured on real EC2 instances (Tokyo, 3 brokers across 3 AZs, m7g.large). Evidence files with raw command output are in [`evidence/`](evidence/).
+## Why this exists
+
+Some workloads — exchanges, payment ledgers, order books — need a **strongly consistent, byte-identical backup replica in a slow AZ or a remote site**, but cannot let that replica slow down the main write path. Vanilla Kafka forces a choice:
+
+- Put the remote replica **in the ISR** → `acks=all` waits for it; the high-watermark is set by the slowest member; the main path inherits cross-AZ latency. (We measured this first: the config-only approach works for consistency but drags the HW.)
+- Keep it **out of the replica set** and replicate cross-cluster (MirrorMaker 2 etc.) → *consume → re-produce*: the target reassigns offsets, so exactly-once is structurally impossible and client failover requires offset translation. Under one `kill -9` in the offset-flush window, our MM2 control group re-delivered **20,000 duplicate messages** ([evidence](evidence/mm2_duplicate_evidence.md)).
+
+The industry solved this with a third replica state — a replica that syncs everything but is invisible to acks, HW, and elections:
+
+- **Confluent Multi-Region Clusters (MRC) Observers** — commercial, closed source.
+- **"Learner" replicas** inside some large tech companies — internal forks, not published.
+- **Apache Kafka upstream** — nothing. KIP-929 "Observer Replicas" is a wiki page with a **zero-length body** (verified via the Confluence API): a placeholder, not a plan.
+
+So users who need this today can buy Confluent, maintain a private fork, or use a maintained, auditable patch set. This project is the third option: **~60 lines of Scala across 5 hook points** (ZooKeeper mode; ~115 lines total with the KRaft controller side), all reusing Kafka's native ISR expansion/shrink machinery, with every claim backed by a raw evidence file. A same-cluster observer is *replicate-the-log*, not *consume → re-produce*: there is no second offset space, so exactly-once survives replication for free — see [docs/eos-semantics.md](docs/eos-semantics.md) and the [industry comparison](docs/industry-comparison.md).
 
 ## What you get
 
@@ -20,9 +38,24 @@ This is the capability known commercially as Confluent Multi-Region Clusters (MR
 | Promoted replica leads & serves | Full election eligibility restored | ✅ kill all ISR → `Leader: 1`, write + read OK |
 | Exactly-once preserved | `appendAsFollower` byte-copies leader batches — offsets, PID, epoch, sequence, txn markers | ✅ per-batch CRC identical; `read_committed` view identical; MM2 control group produced 20 000 duplicates under the same failure |
 
-## Why this matters
+## Architecture
 
-Cross-cluster replication tools (MirrorMaker 2, Confluent Replicator, uReplicator, Brooklin) are all *consume → re-produce*: the target cluster reassigns offsets, so exactly-once is structurally impossible and client failover requires offset translation. A same-cluster observer replica is *replicate-the-log*: there is no second offset space, so EOS survives replication for free. See [docs/eos-semantics.md](docs/eos-semantics.md) and the [industry comparison](docs/industry-comparison.md).
+<p align="center">
+  <img src="docs/diagrams/architecture.svg" alt="Global architecture — 3 AZs, leader + ISR follower + observer; HW advances on ISR only; promotion via observer.ids" width="100%">
+</p>
+
+The observer runs the native follower fetch protocol and holds a byte-identical copy of the log, but gates at the ISR boundary keep it out — so it never slows `acks=all`, never counts toward `min.insync.replicas`, and can never be elected leader (not even unclean). Promotion and demotion are a one-line edit to a file, picked up live:
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    Observer: Observer<br/>(syncs everything, not in ISR, never leader)
+    Electable: Electable replica<br/>(in ISR, leader-eligible)
+    Observer --> Electable: promote — delete id from observer.ids<br/>(native ISR expand, ≤10 s, zero restart)
+    Electable --> Observer: demote — add id back<br/>(native ISR shrink, ≤10 s, zero restart)
+```
+
+Why "not in ISR" implies everything else, the 5 hook points, and the promotion/demotion sequence diagrams: [docs/architecture.md](docs/architecture.md) · monitoring guidance: [docs/monitoring-alerting.md](docs/monitoring-alerting.md).
 
 ## Quick start
 
@@ -46,13 +79,33 @@ cd kafka-src && git apply --3way ../patches/kafka-3.7.1-zk/observer.patch
 kafka-topics.sh --describe --topic your_topic   # observer id absent from Isr
 ```
 
-Full deployment guide including rolling-replacement SOP: [docs/deployment.md](docs/deployment.md).
+Prefer a laptop? `cd docker && docker compose up -d && ./demo.sh` walks the full lifecycle on a local 3-broker cluster ([docker/README.md](docker/README.md)). Full deployment guide including rolling-replacement SOP: [docs/deployment.md](docs/deployment.md).
 
-## Failure runbooks
+## ZooKeeper vs KRaft
+
+Both modes are supported with identical observer semantics, file format, and runbooks — the capability survives a ZK→KRaft migration with no gap. The mechanics differ where the control plane differs:
+
+| | ZooKeeper mode (3.6–3.9) | KRaft mode (3.7.1 / 4.0 / 4.1) |
+|---|---|---|
+| Broker-side hooks | `Partition.scala` × 3 (promotion gate, demotion hook, HW gate) | **Identical** — same file is shared by both modes; anchors byte-identical 3.6.2 → 4.1.0 |
+| Controller-side hooks | `PartitionStateMachine.scala` × 2 (Scala: initial ISR, unclean election) | `ObserverReplicas.java` + 3 hooks in `ReplicationControlManager` (Java, `metadata` module); `LeaderAcceptor.test` covers **all 7 election entry points with one line** |
+| Patch size | ~60 lines | ~115 lines |
+| Jars to deploy | `core` + `storage` | `core` + `storage` + `metadata` — **on controller quorum nodes too** |
+| `observer.ids` distribution | all brokers (controller is a broker) | all brokers **and** controller nodes; when promoting, update controllers *first* (a broker-first mismatch fails safe: AlterPartition rejected `INELIGIBLE_REPLICA` until consistent) |
+| New-topic gotcha | Observer never learns a new topic's assignment while running (controller notifies ISR members only) — restart the observer once after creating topics that span it | **No such limitation** — brokers read assignments from the metadata log (probe-verified) |
+| Demoting a *leader* observer | Move leadership first (native shrink never removes the leader) | **Stricter**: hot demotion of a leader never takes effect (no ZK-style re-election path) — move leadership first or restart that broker once |
+| Extra defense | — | AlterPartition requests from observers rejected controller-side (`INELIGIBLE_REPLICA "observer"`) even if a broker gate is missing |
+| ELR (KIP-966) | n/a | Observers structurally never enter ELR (candidate set = `ELR ∪ ISR`); verified on 4.0 (manually enabled) and 4.1 (default-on). Use 4.1.0 for ELR (carries the KAFKA-19522 fix) |
+
+Full hook matrix, hunk-by-hunk 4.x port analysis, and the KRaft probe that discovered the controller-side gap: [docs/multi-version.md](docs/multi-version.md).
+
+## Failure playbook
+
+Every scenario below was executed on real clusters — the playbook indexes what was run, what happened, and where the raw output lives: [docs/scenario-playbook.md](docs/scenario-playbook.md).
 
 - **Scenario A — one primary AZ down**: writes fail-stop (`NOT_ENOUGH_REPLICAS`) → delete observer id from the file → observer joins ISR in ≤10 s → writes resume. No data movement (it was byte-identical all along). RPO = 0. [runbook](docs/runbooks/scenario-a-az-loss.md)
-- **Scenario B — all primary replicas down**: promote observer → it is elected leader and serves reads/writes (verified on real machines). [runbook](docs/runbooks/scenario-b-total-loss.md)
-- Pre-checks, multi-observer layouts, monitoring: [docs/runbooks/](docs/runbooks/)
+- **Scenario B — all primary replicas down**: un-promoted observer is *never* elected (`Leader: none`, even with unclean election enabled) → promote it → it is elected leader and serves reads/writes. [runbook](docs/runbooks/scenario-b-total-loss.md)
+- Pre-checks, multi-observer layouts, KRaft-specific rules: [docs/runbooks/](docs/runbooks/)
 
 ## Version support
 
@@ -66,13 +119,38 @@ Full deployment guide including rolling-replacement SOP: [docs/deployment.md](do
 
 Patches: [`patches/kafka-3.7.1-zk/`](patches/kafka-3.7.1-zk/) (ZK-only), [`patches/kafka-3.7.1-kraft/`](patches/kafka-3.7.1-kraft/) (**combined ZK+KRaft** — one patched build serves both modes; deploy `core` + `storage` + `metadata` jars), [`patches/kafka-4.0.0-kraft/`](patches/kafka-4.0.0-kraft/) and [`patches/kafka-4.1.0-kraft/`](patches/kafka-4.1.0-kraft/) (pure KRaft — ZooKeeper is removed upstream in 4.0). Full rationale: [docs/multi-version.md](docs/multi-version.md).
 
-> **ELR (KIP-966) note**: observers never enter ELR because the ELR candidate set is built from `ELR ∪ ISR` and observers never enter the ISR — a structural guarantee, verified on real clusters on both 4.0 (ELR manually enabled) and 4.1 (ELR default-on). The observer patch does not touch any ELR code. If you want ELR, use 4.1.0 (default-on and carries the KAFKA-19522 fix); on 4.0.0 leave ELR at its default (off) and behavior is equivalent to 3.7.1.
+## Operability
 
-> ⚠️ **KRaft-specific demotion rule** (real-machine finding): demoting an observer that is *currently a leader* does not take effect hot — the leader never self-removes from ISR and KRaft has no ZK-style re-election path for this. Move leadership first (`kafka-leader-election.sh`), or restart that broker once. Follower demotion is hot (≤10 s) as usual.
+Operational tooling around the core patch (see also [docs/monitoring-alerting.md](docs/monitoring-alerting.md)):
+
+- **Promote / demote scripts**: [`scripts/observer-promote.sh`](scripts/observer-promote.sh) / [`scripts/observer-demote.sh`](scripts/observer-demote.sh) — atomic file edits with pre-checks.
+- **Optional auto-promotion watchdog** (`under-min-isr` policy, **off by default** — deterministic manual operation is the recommended posture for financial workloads): [`scripts/observer-auto-promoter.sh`](scripts/observer-auto-promoter.sh) + [systemd unit](deploy/observer-auto-promoter.service), design and risk boundary in [docs/auto-promotion.md](docs/auto-promotion.md).
+
+## Project layout
+
+```
+patches/     canonical observer.patch per Kafka version; archive/ keeps the v0.1/v0.2/v0.3 POC iterations
+docs/        architecture · design story · deployment · runbooks · scenario playbook · multi-version · FAQ · 中文文档 (zh/)
+evidence/    raw real-machine verification reports — every claim in this README traces to one of these
+scripts/     observer-promote / observer-demote / optional auto-promoter
+tools/       apply-and-build.sh · generate-patch.py · check-anchors.sh (offline drift sentinel)
+docker/      local 3-broker verification environment (builds patched Kafka from source)
+terraform/   the Tokyo 3-AZ POC topology that produced every number in evidence/
+test/        pytest integration suite run against a live cluster
+deploy/      systemd units
+```
+
+## Evidence-driven development
+
+This repository follows one rule: **no claim without a raw evidence file.** Every capability in the tables above links to a report in [`evidence/`](evidence/) containing the actual commands and their output from real EC2 clusters — including the uncomfortable results (the MM2 duplicate count, the KRaft probe that proved two hooks *don't* fire, the leader-demotion limitation, a confirmed upstream bug). Statements are tagged fact vs inference in the source reports, and negative results get shipped, not buried. When a claim is upgraded (e.g. "anchors look identical" → "patch applies and compiles on every version"), the evidence is re-collected, not extrapolated. The three-iteration path that produced this design — including the two vulnerabilities found and fixed along the way — is written up as a systems-research walkthrough in [docs/design-story.md](docs/design-story.md).
+
+## FAQ
+
+KIP-966 relationship, why not wait for upstream, differences from Confluent MRC, redistribution legality, maintenance cost across upgrades, multi-observer layouts: [docs/faq.md](docs/faq.md).
 
 ## Project status & versioning
 
-Current release: **v0.6** (ZK 3.6–3.9 + KRaft 3.7.1 / 4.0.0 / 4.1.0, ELR compatibility verified). Roadmap to v0.7+ (metrics, auto-promotion policy) in [ROADMAP.md](ROADMAP.md).
+Current release: **v0.6** (ZK 3.6–3.9 + KRaft 3.7.1 / 4.0.0 / 4.1.0, ELR compatibility verified). Roadmap to v0.7+ (metrics, auto-promotion policy) in [ROADMAP.md](ROADMAP.md). Change history: [CHANGELOG.md](CHANGELOG.md). 中文版 README: [docs/zh/README.md](docs/zh/README.md).
 
 ## License & trademark note
 

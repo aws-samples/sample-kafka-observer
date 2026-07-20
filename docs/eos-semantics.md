@@ -1,5 +1,9 @@
 # EOS semantics — why exactly-once survives observer replication for free
 
+<p align="center">
+  <img src="diagrams/eos-comparison.svg" alt="Replication comparison — observer byte-copy keeps one offset space and identical CRCs; MM2 consume-reproduce breaks the offset space and duplicated 20000 messages" width="100%">
+</p>
+
 ## The precise claim
 
 Observer replication does not "implement" exactly-once. It **preserves** it, because the replication path sits entirely outside the surface EOS defends.

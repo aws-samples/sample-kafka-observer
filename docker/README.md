@@ -50,7 +50,7 @@ docker compose exec kafka2 kafka-topics.sh --bootstrap-server kafka2:9092 \
 #     LeaderAndIsr only to ISR members at creation, so the observer does not
 #     start fetching a brand-new topic until its next restart (or a controller
 #     failover). Existing topics are unaffected. One restart makes broker 1
-#     fetch 'demo' (KRaft mode in v0.4 removes this entirely):
+#     fetch 'demo' (KRaft mode does not have this limitation):
 docker compose restart kafka1
 
 # 4. Verify: broker 1 is in Replicas but NOT in Isr — that is the observer
@@ -118,7 +118,7 @@ Consequences for this environment:
 - Topics that existed before the observer's last (re)start are unaffected;
   promote/demote on them is fully zero-restart.
 
-KRaft mode (v0.4) does not have this limitation — brokers read assignments
+KRaft mode does not have this limitation — brokers read assignments
 from the shared metadata log. See
 [docs/multi-version.md](../docs/multi-version.md) and
 [docs/architecture.md](../docs/architecture.md#known-behavior-notes).

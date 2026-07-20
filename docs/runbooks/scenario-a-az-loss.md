@@ -1,5 +1,9 @@
 # Runbook — Scenario A: one primary AZ is lost
 
+<p align="center">
+  <img src="../diagrams/failure-scenario-a.svg" alt="Scenario A animation — steady state, AZ loss and fail-stop, observer promotion, writes resume with RPO 0" width="100%">
+</p>
+
 **Topology assumed**: primary replicas on a fast AZ pair (e.g. 1c+1d), observer in a third AZ (e.g. 1a). `min.insync.replicas=2`, `acks=all`, `unclean.leader.election.enable=false`.
 
 ## What happens at failure
