@@ -1,8 +1,8 @@
 # sample-kafka-observer
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![CI](https://img.shields.io/badge/CI-build--verify%20%C3%97%207%20Kafka%20versions-success)](.github/workflows/build-verify.yml)
-[![Version](https://img.shields.io/badge/release-v0.6.0-informational)](CHANGELOG.md)
+[![CI](https://img.shields.io/badge/CI-build--verify%20%C3%97%208%20legs-success)](.github/workflows/build-verify.yml)
+[![Version](https://img.shields.io/badge/release-v0.7.0-informational)](CHANGELOG.md)
 [![Kafka](https://img.shields.io/badge/Kafka-3.6%20%E2%80%93%204.1%20%C2%B7%20ZK%20%2B%20KRaft-231F20?logo=apachekafka)](docs/multi-version.md)
 
 **Observer/Learner replicas for Apache Kafka — an open reference implementation.**
@@ -117,14 +117,27 @@ Every scenario below was executed on real clusters — the playbook indexes what
 | 4.0.0 | **KRaft** | ✅ **verified on a real 6-node cluster** (v0.6, 3 controllers + 3 brokers): the 8 usable hunks of the 3.7.1 patch applied with line-number drift only (the 2 ZK-controller hunks are dropped — Kafka 4.0 removed ZooKeeper); full capability matrix passed — initial-ISR filtering, full sync, promotion ~4 s / follower demotion ~12 s, preferred election after promotion, unclean election refusal (`Leader: none`, zero data loss). ELR manually enabled and re-verified: observer never enters ELR/LastKnownElr. [port evidence](evidence/kafka40_port_evidence.md) · [ELR evidence](evidence/elr_verification_evidence.md) |
 | 4.1.0 | **KRaft** | ✅ **verified on a real 6-node cluster** (v0.6): patch byte-identical to the 4.0.0 one (hunk offsets only), compiles cleanly. ELR is **default-on** for new 4.1 clusters — verified that observers structurally never enter ELR/LastKnownElr and are never elected even with `unclean.leader.election.enable=true`; ELR members recover with clean election, zero data loss. Includes the upstream KAFKA-19522 fix (fenced last-known-leader mis-election present in 3.7.1/4.0.0). [evidence](evidence/elr_verification_evidence.md) |
 
-Patches: [`patches/kafka-3.7.1-zk/`](patches/kafka-3.7.1-zk/) (ZK-only), [`patches/kafka-3.7.1-kraft/`](patches/kafka-3.7.1-kraft/) (**combined ZK+KRaft** — one patched build serves both modes; deploy `core` + `storage` + `metadata` jars), [`patches/kafka-4.0.0-kraft/`](patches/kafka-4.0.0-kraft/) and [`patches/kafka-4.1.0-kraft/`](patches/kafka-4.1.0-kraft/) (pure KRaft — ZooKeeper is removed upstream in 4.0). Full rationale: [docs/multi-version.md](docs/multi-version.md).
+Patches: [`patches/kafka-3.7.1-zk/`](patches/kafka-3.7.1-zk/) (ZK-only), [`patches/kafka-3.7.1-kraft/`](patches/kafka-3.7.1-kraft/) (**combined ZK+KRaft** — one patched build serves both modes; deploy `core` + `storage` + `metadata` jars), [`patches/kafka-3.7.1-kraft-v07/`](patches/kafka-3.7.1-kraft-v07/) (combined + the v0.7 metrics/audit layer — functional hooks byte-identical to the combined patch), [`patches/kafka-4.0.0-kraft/`](patches/kafka-4.0.0-kraft/) and [`patches/kafka-4.1.0-kraft/`](patches/kafka-4.1.0-kraft/) (pure KRaft — ZooKeeper is removed upstream in 4.0). Full rationale: [docs/multi-version.md](docs/multi-version.md).
 
 ## Operability
 
-Operational tooling around the core patch (see also [docs/monitoring-alerting.md](docs/monitoring-alerting.md)):
+Shipped in v0.7 and verified end-to-end (JMX readings + fault injection) on a live patched KRaft cluster — raw output in [evidence/v07_operability_evidence.md](evidence/v07_operability_evidence.md). Full monitoring guidance: [docs/monitoring-alerting.md](docs/monitoring-alerting.md).
 
-- **Promote / demote scripts**: [`scripts/observer-promote.sh`](scripts/observer-promote.sh) / [`scripts/observer-demote.sh`](scripts/observer-demote.sh) — atomic file edits with pre-checks.
-- **Optional auto-promotion watchdog** (`under-min-isr` policy, **off by default** — deterministic manual operation is the recommended posture for financial workloads): [`scripts/observer-auto-promoter.sh`](scripts/observer-auto-promoter.sh) + [systemd unit](deploy/observer-auto-promoter.service), design and risk boundary in [docs/auto-promotion.md](docs/auto-promotion.md).
+**JMX metrics** — 7 gauges layered on the v0.6 combined patch as [`patches/kafka-3.7.1-kraft-v07/observer.patch`](patches/kafka-3.7.1-kraft-v07/) (functional hooks byte-identical to v0.6; v0.7 only adds the ability to *see*, not new behavior):
+
+| MBean | Level | Semantics (as measured) |
+|---|---|---|
+| `kafka.observer:type=ObserverMetrics,name=ObserverCount` | broker | Size of this node's `observer.ids` view — compare across nodes to detect file drift. Lazily registered: absent on a broker that leads no partitions |
+| `kafka.server:type=ReplicaManager,name=ObserversInIsrCount` | broker (leader view) | **Steady state 0.** Non-zero only during a demotion transition (~5 s measured window) or a real gate bypass / file inconsistency — the highest-value alert metric. Alert on `> 0` sustained beyond 2× `replica.lag.time.max.ms` |
+| `kafka.server:type=ReplicaManager,name=ObserverCaughtUpCount` | broker | Caught-up observers across led partitions (native `isCaughtUp` — same function the ISR check uses) |
+| `kafka.server:type=ReplicaManager,name=ObserverLagMessages` | broker | Sum of the max observer LEO lag over led partitions |
+| `kafka.cluster:type=Partition,name={ObserversInIsrCount, ObserverCaughtUpCount, ObserverLagMessages},topic=…,partition=…` | per partition | The same three per partition — parity with the isObserver / isCaughtUp / lag fields of Confluent's `kafka-replica-status.sh` |
+
+**Structured audit log**: every observer-set change emits a WARN pair — `OBSERVER AUDIT (broker)` + `OBSERVER AUDIT (controller)` — with `before/after/added/removed/source/epochMs` fields (`removed` non-empty = promotion, `added` non-empty = demotion). The complete observer-set history is reconstructible from logs alone.
+
+**Promote / demote scripts**: [`scripts/observer-promote.sh`](scripts/observer-promote.sh) / [`scripts/observer-demote.sh`](scripts/observer-demote.sh) — atomic file edits with pre-checks.
+
+**Optional auto-promotion watchdog** (`under-min-isr` policy, **off by default** — deterministic manual operation is the recommended posture for financial workloads): [`scripts/observer-auto-promoter.sh`](scripts/observer-auto-promoter.sh) + [systemd unit](deploy/observer-auto-promoter.service). Verified end-to-end with real fault injection: broker kill → detection → automatic promotion (scan→OK **12 s**) → recovery → automatic demotion (**31 s**, incl. a 5 s double-confirm), with dry-run mode touching nothing. Design, risk boundary, and the enable SOP: [docs/auto-promotion.md](docs/auto-promotion.md).
 
 ## Project layout
 
@@ -150,7 +163,7 @@ KIP-966 relationship, why not wait for upstream, differences from Confluent MRC,
 
 ## Project status & versioning
 
-Current release: **v0.6** (ZK 3.6–3.9 + KRaft 3.7.1 / 4.0.0 / 4.1.0, ELR compatibility verified). Roadmap to v0.7+ (metrics, auto-promotion policy) in [ROADMAP.md](ROADMAP.md). Change history: [CHANGELOG.md](CHANGELOG.md). 中文版 README: [docs/zh/README.md](docs/zh/README.md).
+Current release: **v0.7** (operability: JMX metrics, structured audit log, opt-in auto-promotion — all real-machine verified; core support unchanged: ZK 3.6–3.9 + KRaft 3.7.1 / 4.0.0 / 4.1.0, ELR compatibility verified). Roadmap to v0.8+ (topic-level config, upstream KIP tracking, long-soak testing) in [ROADMAP.md](ROADMAP.md). Change history: [CHANGELOG.md](CHANGELOG.md). 中文版 README: [docs/zh/README.md](docs/zh/README.md).
 
 ## License & trademark note
 

@@ -9,9 +9,78 @@ the current design. Nothing before v1.0 carries API-stability guarantees.
 
 ## [Unreleased]
 
-- v0.7 (backlog): metrics (`ObserversInIsrCount`, per-replica observer status),
-  optional auto-promotion policy, promotion/demotion audit log, aws-samples
-  publication readiness (see ROADMAP.md)
+- v0.8 (outlook): topic-level observer config (`observer.replicas`) or
+  metadata-log-propagated marker as the file-distribution successor; upstream
+  KIP tracking (KIP-966 / KIP-929); long-running soak test of the
+  auto-promoter daemon mode (see ROADMAP.md)
+
+## [0.7.0] - 2026-07-20
+
+Operability layer: JMX metrics, structured audit log, and an opt-in
+auto-promotion watchdog — all verified end-to-end on a real patched KRaft
+cluster (Tokyo; JMX readings + fault injection). Functional observer hooks
+are byte-identical to v0.6 (zero behavior change — v0.7 only adds the
+ability to observe and to automate). Raw evidence in
+`evidence/metrics_patch_evidence.md` (build) and
+`evidence/v07_operability_evidence.md` (runtime).
+
+### Added
+
+- **Canonical patch** `patches/kafka-3.7.1-kraft-v07/observer.patch` —
+  combined ZK+KRaft patch (v0.6 hooks, 12 `OBSERVER PATCH` markers verified
+  byte-identical) plus the v0.7 observability layer (6 files, +384/−8):
+  - **7 JMX gauges**, all reusing native `KafkaMetricsGroup` registration
+    (lock-free reads of existing volatile state, no extra IO):
+    - `kafka.observer:type=ObserverMetrics,name=ObserverCount` — this node's
+      view of the observer set size (detects file drift across nodes;
+      lazily registered — absent on a broker leading no partitions)
+    - `kafka.server:type=ReplicaManager,name=ObserversInIsrCount` — steady
+      state 0; measured non-zero only in the demotion transition window
+      (~5 s at `replica.lag.time.max.ms=10s`) or on a real gate bypass /
+      file inconsistency. Recommended alert: `> 0` sustained beyond
+      2× `replica.lag.time.max.ms`
+    - `kafka.server:type=ReplicaManager,name=ObserverCaughtUpCount` /
+      `ObserverLagMessages` — observer catch-up status using the native
+      `isCaughtUp` function (same semantics as the ISR check)
+    - per-partition `kafka.cluster:type=Partition,name={ObserversInIsrCount,
+      ObserverCaughtUpCount,ObserverLagMessages},topic=…,partition=…` —
+      parity with the isObserver/isCaughtUp/lag fields of Confluent's
+      `kafka-replica-status.sh`
+- **Structured audit log** (WARN, default-visible): every observer-set change
+  emits a broker/controller pair — `OBSERVER AUDIT (broker)` /
+  `OBSERVER AUDIT (controller)` — with
+  `before/after/added/removed/source/epochMs` fields (`removed` non-empty =
+  promotion, `added` non-empty = demotion; `source` distinguishes file vs
+  env fallback). Measured file-change → first audit line: 3–6 s.
+- **Auto-promotion watchdog** `scripts/observer-auto-promoter.sh`
+  (`under-min-isr` policy, **default OFF** with an explicit `-e` interlock)
+  + systemd unit template `deploy/observer-auto-promoter.service` (never
+  auto-installed) + design/risk/SOP doc `docs/auto-promotion.md`.
+  Fault-injection verification on a live cluster: broker kill → `DETECT` →
+  automatic promotion (scan→PROMOTE-OK **12 s**; ISR restored to ≥ minISR,
+  zero restart, zero data movement) → broker recovery → double-confirmed
+  automatic demotion (scan→DEMOTE-OK **31 s**, incl. 5 s double-check;
+  ownership state file correctly cleared). Dry-run mode (`-n`) verified to
+  log full decisions while mutating nothing. Safety: caught-up gate,
+  anti-flap cooldown, max one action per scan, scoped ownership
+  (only auto-demotes brokers it promoted), audit-or-die.
+- **docs/monitoring-alerting.md** updated from design names to the shipped,
+  measured metric semantics and alert thresholds.
+
+### Known boundaries (measured, not hidden)
+
+- The `kafka.observer` ObserverCount MBean is lazily registered; monitoring
+  must tolerate its absence on brokers leading no partitions (or use the
+  ReplicaManager gauges).
+- Per-partition lag is an LEO message count, not a time lag; the
+  `lastCaughtUpLagMs` equivalent is derivable from caught-up counts (no
+  per-replica MBean — avoids MBean-cardinality explosion).
+- The demotion transition shows `ObserversInIsrCount=1` for roughly the
+  native shrink latency (longer at the default 30 s
+  `replica.lag.time.max.ms`) — alert rules need a duration condition.
+- Auto-promoter daemon mode (`-i` loop) shares the verified single-scan
+  logic, but cooldown/anti-flap behavior under long sustained operation has
+  not been soak-tested (v0.8 item).
 
 ## [0.6.0] - 2026-07-20
 
@@ -148,7 +217,8 @@ m7g.large). Raw evidence in `evidence/`.
   (the native shrink path never removes the leader itself — a safety property,
   not a bug).
 
-[Unreleased]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.3.0...v0.5.0
 [0.3.0]: https://github.com/aws-samples/sample-kafka-observer/releases/tag/v0.3.0

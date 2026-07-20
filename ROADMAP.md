@@ -16,13 +16,28 @@ All verified on real EC2 clusters (Tokyo, 3 controller-only + 3 broker nodes) �
 
 Carried over to v0.7 (not blocking): none of the 4.0/4.1 items — the runtime ELR tests originally slated as "pending" were completed in this cycle.
 
-## v0.7 — operability & publication (backlog)
+## v0.8 / v1.0 — outlook
 
-- Metrics: `ObserversInIsrCount`, per-replica `isObserver / isCaughtUp / lastCaughtUpLagMs` (parity with Confluent's `kafka-replica-status.sh` output)
-- Optional auto-promotion policy (`under-min-isr`, default **off** — deterministic manual operation is the recommended posture for financial workloads)
-- Promotion/demotion audit log; promote/demote CLI pre-checks (caught-up lag threshold; leader check; post-demotion `ISR ≥ min.insync.replicas`)
-- aws-samples publication readiness: repo hygiene pass, license/NOTICE review, README English polish
-- Topic-level observer config (`observer.replicas`) or metadata-log-propagated marker as the file-distribution successor
+- **Topic-level observer config** (`observer.replicas`, prototyped in v0.2) or a metadata-log-propagated marker as the file-distribution successor — removes the multi-node file-consistency burden entirely
+- **Upstream KIP tracking**: KIP-966 (ELR) as the official "ISR membership ≠ election eligibility" beachhead; contribute learnings if a real observer KIP ever opens (KIP-929 remains a zero-length placeholder as of 2026-07)
+- **Long-running soak test**: multi-day sustained-traffic run with periodic fault injection — auto-promoter daemon mode (`-i 10`) cooldown/anti-flap behavior under repeated cycles is the main unproven area (v0.7 verified single-scan-driven cycles only)
+- v1.0 gate: API/file-format stability guarantees, at least one external production adoption report
+
+## v0.7 — operability ✅ SHIPPED (2026-07-20)
+
+All verified end-to-end on a real patched KRaft cluster (Tokyo; JMX readings via JmxTool + fault injection) — see `evidence/metrics_patch_evidence.md` (build) and `evidence/v07_operability_evidence.md` (runtime):
+
+- **7 JMX gauges** layered on the v0.6 combined patch — canonical patch `patches/kafka-3.7.1-kraft-v07/observer.patch` (6 files, +384/−8; the 12 functional `OBSERVER PATCH` markers verified byte-identical to v0.6 — zero behavior change):
+  - broker: `kafka.observer:…ObserverCount`, `ReplicaManager` `ObserversInIsrCount` / `ObserverCaughtUpCount` / `ObserverLagMessages`
+  - per-partition: the same three under `kafka.cluster:type=Partition` — parity with the isObserver/isCaughtUp/lag fields of Confluent's `kafka-replica-status.sh`
+  - `ObserversInIsrCount` semantics confirmed in both directions on a live cluster: a promoted broker in ISR but off the list reads 0; the demotion transition shows a ~5 s `Value=1` window before native shrink returns it to 0 → alert on `> 0` sustained beyond 2× `replica.lag.time.max.ms`
+  - Known boundary (as measured): the `kafka.observer` ObserverCount MBean is lazily registered — absent on a broker leading no partitions; per-partition lag is LEO message count, not time (`lastCaughtUpLagMs` equivalent is derivable from caught-up counts; no per-replica MBean to avoid cardinality explosion)
+- **Structured audit log**: WARN `OBSERVER AUDIT (broker)` / `(controller)` pair on every observer-set change, fields `before/after/added/removed/source/epochMs` (`removed`≠∅ = promotion, `added`≠∅ = demotion); measured file-change→first-audit-line latency 3–6 s (within the 5 s cache)
+- **Auto-promotion watchdog** (`scripts/observer-auto-promoter.sh`, `under-min-isr` policy, default **OFF** with `-e` interlock): full fault-injection cycle verified — broker kill → `DETECT` → automatic promotion (scan→PROMOTE-OK **12 s**, ISR restored to ≥ minISR with zero restart/data movement) → broker recovery → double-confirmed automatic demotion (scan→DEMOTE-OK **31 s**, state file correctly cleared). Dry-run mode (`-n`) verified to mutate nothing. Design + risk boundary + enable SOP: `docs/auto-promotion.md`
+- Promote/demote CLI pre-checks (caught-up lag threshold; leader check; post-demotion `ISR ≥ min.insync.replicas`) exercised as part of the demotion path
+- aws-samples publication readiness: repo hygiene pass, license/NOTICE review, README polish (`PUBLICATION_CHECKLIST.md`)
+
+Not done in v0.7 (moved up): topic-level observer config → v0.8; daemon-mode long-soak observation → v0.8.
 
 ## v0.3 — ZooKeeper mode (shipped)
 
@@ -81,4 +96,3 @@ Status upgrade after real-machine probe + source verification (2026-07-20, see `
 ## Later
 
 - Terraform one-command verification environment (module exists; extend to full test matrix)
-- Upstream engagement: track KIP-966 (ELR) as the official "ISR membership ≠ election eligibility" beachhead; contribute learnings if a real observer KIP ever opens (KIP-929 is an empty placeholder as of 2026-07).
