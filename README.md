@@ -55,12 +55,15 @@ Full deployment guide including rolling-replacement SOP: [docs/deployment.md](do
 
 | Kafka version | Mode | Status |
 |---|---|---|
-| 3.7.1 | ZooKeeper | ✅ verified on real clusters (v0.3) |
-| 3.7.1 | KRaft | 🔬 **broker-side hooks probe-verified on a real KRaft cluster** (promotion gate, demotion hook, dynamic file all work; controller-side exclusions confirmed *not* to fire — see [evidence](evidence/kraft_probe_evidence.md)) |
-| 3.7.x / 3.9.x / 4.0 | KRaft | 🔄 v0.4 — controller side moves to `ReplicationControlManager` / `PartitionChangeBuilder` (~70 new lines, design source-verified) |
-| 4.1+ | KRaft | v0.5 — adds ELR (KIP-966) exclusion |
+| 3.7.1 | ZooKeeper | ✅ verified on real clusters (v0.3, [evidence](evidence/observer_v3_lifecycle_evidence.md)) |
+| 3.7.1 | **KRaft** | ✅ **verified — full 8-item capability matrix passed** (v0.5): initial-ISR filtering, unclean election refusal, promotion 4 s / demotion 9 s, promoted observer serves as leader, new-topic instant fetch. Controller-side Java patch (`ObserverReplicas.java` + 3 RCM hooks), verified in both combined and controller-only topologies. [evidence](evidence/kraft_controller_patch_evidence.md) |
+| 3.6.2 / 3.8.1 / 3.9.1 | ZooKeeper | ✅ canonical patch applies + compiles cleanly (real-machine, [evidence](evidence/multiversion_apply_evidence.md)); weekly CI drift sentinel |
+| 4.0.x | KRaft | 🔄 same hook points confirmed at source level; CI verification pending |
+| 4.1+ | KRaft | 🔄 adds ELR (KIP-966) test coverage (observers structurally never enter ELR) |
 
-Full decision rationale and per-version hook matrix: [docs/multi-version.md](docs/multi-version.md).
+Patches: [`patches/kafka-3.7.1-zk/`](patches/kafka-3.7.1-zk/) (ZK-only) and [`patches/kafka-3.7.1-kraft/`](patches/kafka-3.7.1-kraft/) (**combined ZK+KRaft** — one patched build serves both modes; deploy `core` + `storage` + `metadata` jars). Full rationale: [docs/multi-version.md](docs/multi-version.md).
+
+> ⚠️ **KRaft-specific demotion rule** (real-machine finding): demoting an observer that is *currently a leader* does not take effect hot — the leader never self-removes from ISR and KRaft has no ZK-style re-election path for this. Move leadership first (`kafka-leader-election.sh`), or restart that broker once. Follower demotion is hot (≤10 s) as usual.
 
 ## Project status & versioning
 

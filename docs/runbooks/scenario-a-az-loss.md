@@ -46,6 +46,7 @@ sudo mv /opt/kafka/observer.ids.tmp /opt/kafka/observer.ids
 
 | Before | Check | Why |
 |---|---|---|
-| Demotion | The broker is not currently a leader (run preferred election first if it is) | The native shrink path never removes the leader itself |
+| Demotion | The broker is not currently a leader (run preferred election first if it is) | The native shrink path never removes the leader itself. **KRaft is stricter** (real-machine finding): a leader-observer demotion never takes effect hot — no ZK-style re-election path exists; move leadership first or restart that broker once |
 | Demotion | `ISR − {broker} ≥ min.insync.replicas` | Otherwise the demotion itself triggers fail-stop |
 | Promotion | Replica lag ≈ 0 (`kafka-topics --describe` / replica lag metrics) | Promotion of a lagging observer stalls HW until it catches up |
+| Promotion (KRaft) | Update `observer.ids` on **controller quorum nodes first**, then brokers | If a broker's gate opens before the controller's, AlterPartition is rejected `INELIGIBLE_REPLICA` until the controller file catches up (fail-safe but adds latency) |

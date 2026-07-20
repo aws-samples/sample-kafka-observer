@@ -22,7 +22,25 @@ Known limitations (documented, not hidden):
 - Observer list file must be identical on all brokers; inconsistency window is bounded (rollout + 5 s) but should be pushed by a single script with checksum verification.
 - Demoting a broker that is currently leader requires moving the leader first (the native shrink path never removes the leader itself — this is a safety property, not a bug).
 
-## v0.4 — KRaft support (design complete, probe-verified)
+## v0.5 — KRaft support ✅ SHIPPED (2026-07-20)
+
+Full 8-item capability matrix passed on real machines (Tokyo, both combined and controller-only topologies) — see `evidence/kraft_controller_patch_evidence.md`:
+
+1. ✅ Initial-ISR filtering (the decisive item that failed in the probe): controller log `Filtered observers [3] from initial ISR [1,2,3] -> [1,2]`
+2. ✅ Full sync, byte-identical data on observer
+3. ✅ Never in ISR under sustained traffic
+4. ✅ Promotion ≤30 s target → measured **4 s**
+5. ✅ Demotion ≤45 s target → measured **9 s** (follower case)
+6. ✅ Promoted observer elected leader + serves writes (200 msgs verified)
+7. ✅ New-topic instant fetch (ZK-mode limitation confirmed absent in KRaft)
+8. ✅ AlterPartition defense-in-depth (`INELIGIBLE_REPLICA "observer"`)
+9. ✅ Unclean election refusal: with only the observer surviving, `Leader: none` — never the observer
+
+Deliverables: `patches/kafka-3.7.1-kraft/observer.patch` (combined ZK+KRaft — one build serves both modes; **deploy core + storage + metadata jars**, and `observer.ids` to controller nodes too).
+
+**New operational finding**: demoting a *leader* observer does not take effect hot under KRaft (leader never self-removes from ISR; no ZK-style re-election path). SOP: move leadership first, or restart that broker. Codified in runbooks.
+
+## v0.4 — original design notes (superseded by shipped v0.5 above)
 
 Status upgrade after real-machine probe + source verification (2026-07-20, see `evidence/kraft_probe_evidence.md` and `docs/multi-version.md`):
 
