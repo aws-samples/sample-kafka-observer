@@ -1,0 +1,211 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+  <!-- Story animation: Scenario A (one AZ lost), 20 s loop, 5 phases
+       Phase boundaries (fraction of 20 s): 0 / 0.175 / 0.40 / 0.55 / 0.775 / 1 -->
+  <rect x="0" y="0" width="1000" height="640" rx="12" fill="#1a2332"/>
+  <text x="30" y="34" fill="#e6edf3" font-size="19" font-weight="700">Story · AZ loss — fail-stop, one file edit, writes back in ~9 s, RPO = 0</text>
+  <text x="970" y="34" fill="#9fb0c3" font-size="12" text-anchor="end">20 s loop · real-machine numbers (Tokyo, 3 AZs)</text>
+
+  <!-- ===== Phase banners (one visible at a time) ===== -->
+  <g font-size="21" font-weight="800" text-anchor="middle">
+    <text x="500" y="80" fill="#9fb0c3" opacity="0">STEP 0 · Steady state — 2 primary AZs in ISR, third-AZ observer syncing
+      <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.02;0.155;0.175;1" dur="20s" repeatCount="indefinite"/></text>
+    <text x="500" y="80" fill="#ff453a" opacity="0">STEP 1 · AZ lost → fail-stop — ISR below minISR, no wrong acks, ever
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.175;0.195;0.38;0.40;1" dur="20s" repeatCount="indefinite"/></text>
+    <text x="500" y="80" fill="#d29922" opacity="0">STEP 2 · Operator acts — remove broker 3's id from observer.ids
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.40;0.42;0.53;0.55;1" dur="20s" repeatCount="indefinite"/></text>
+    <text x="500" y="80" fill="#30d158" opacity="0">STEP 3 · Observer joins ISR → writes resume — ~9 s from action to recovery
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.55;0.57;0.755;0.775;1" dur="20s" repeatCount="indefinite"/></text>
+    <text x="500" y="80" fill="#30d158" opacity="0">STEP 4 · AZ-2 returns → auto-rejoins ISR → observer demoted back
+      <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.775;0.795;0.99;1" dur="20s" repeatCount="indefinite"/></text>
+  </g>
+
+  <!-- ===== Producer ===== -->
+  <g>
+    <rect x="30" y="170" width="150" height="100" rx="10" fill="#223044" stroke="#4dabf7" stroke-width="2"/>
+    <text x="105" y="203" fill="#e6edf3" font-size="14" font-weight="700" text-anchor="middle">producer</text>
+    <text x="105" y="224" fill="#9fb0c3" font-size="11" text-anchor="middle">acks=all</text>
+    <text x="105" y="242" fill="#9fb0c3" font-size="11" text-anchor="middle">minISR=2</text>
+  </g>
+  <!-- producer error during fail-stop -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.175;0.195;0.60;0.62;1" dur="20s" repeatCount="indefinite"/>
+    <rect x="16" y="285" width="178" height="26" rx="6" fill="#2b1518" stroke="#ff453a" stroke-width="1.5"/>
+    <text x="105" y="303" fill="#ff453a" font-size="12" font-weight="700" text-anchor="middle">✗ NOT_ENOUGH_REPLICAS</text>
+  </g>
+
+  <!-- ===== AZ containers ===== -->
+  <g fill="#9fb0c3" font-size="12" font-weight="700">
+    <rect x="240" y="120" width="200" height="180" rx="10" fill="#1f2a3a" stroke="#3d4f66" stroke-width="1.5"/>
+    <text x="252" y="140">AZ-1</text>
+    <rect x="480" y="120" width="200" height="180" rx="10" fill="#1f2a3a" stroke="#3d4f66" stroke-width="1.5"/>
+    <text x="492" y="140">AZ-2</text>
+    <rect x="720" y="120" width="200" height="180" rx="10" fill="#1f2a3a" stroke="#3d4f66" stroke-width="1.5"/>
+    <text x="732" y="140">AZ-3</text>
+  </g>
+
+  <!-- broker 1: leader (never changes) -->
+  <g>
+    <rect x="260" y="155" width="160" height="115" rx="10" fill="#223044" stroke="#ff9900" stroke-width="3"/>
+    <text x="340" y="188" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 1</text>
+    <text x="340" y="210" fill="#ff9900" font-size="13" font-weight="700" text-anchor="middle">LEADER</text>
+    <text x="340" y="232" fill="#30d158" font-size="11" font-weight="700" text-anchor="middle">in ISR</text>
+    <text x="340" y="252" fill="#9fb0c3" font-size="10.5" text-anchor="middle">never changes in this story</text>
+  </g>
+
+  <!-- broker 2: ISR follower (dims when AZ-2 dies, returns in STEP 4) -->
+  <g>
+    <animate attributeName="opacity" values="1;1;0.15;0.15;1;1" keyTimes="0;0.175;0.195;0.775;0.80;1" dur="20s" repeatCount="indefinite"/>
+    <rect x="500" y="155" width="160" height="115" rx="10" fill="#223044" stroke="#30d158" stroke-width="2"/>
+    <text x="580" y="188" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 2</text>
+    <text x="580" y="210" fill="#30d158" font-size="13" font-weight="700" text-anchor="middle">follower · in ISR</text>
+    <text x="580" y="234" fill="#9fb0c3" font-size="11" text-anchor="middle">fast AZ pair with leader</text>
+  </g>
+  <!-- broker 2 outage overlay -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.175;0.195;0.775;0.80;1" dur="20s" repeatCount="indefinite"/>
+    <rect x="480" y="120" width="200" height="180" rx="10" fill="none" stroke="#ff453a" stroke-width="2.5" stroke-dasharray="8 6"/>
+    <rect x="500" y="155" width="160" height="115" rx="10" fill="#2b1518" stroke="#ff453a" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="580" y="196" fill="#ff453a" font-size="16" font-weight="800" text-anchor="middle">✗ broker 2</text>
+    <text x="580" y="220" fill="#ff453a" font-size="12" font-weight="700" text-anchor="middle">AZ-2 LOST</text>
+    <text x="580" y="242" fill="#9fb0c3" font-size="10.5" text-anchor="middle">drops from ISR after lag timeout</text>
+  </g>
+
+  <!-- broker 3: observer (purple) → promoted ISR member (green) in STEP 3, demoted back in STEP 4 -->
+  <g>
+    <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.60;0.62;0.93;0.95;1" dur="20s" repeatCount="indefinite"/>
+    <rect x="740" y="155" width="160" height="115" rx="10" fill="#241f33" stroke="#bf5af2" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="820" y="188" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 3</text>
+    <text x="820" y="210" fill="#bf5af2" font-size="13" font-weight="700" text-anchor="middle">OBSERVER</text>
+    <text x="820" y="234" fill="#9fb0c3" font-size="11" text-anchor="middle">syncs, not electable</text>
+  </g>
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.60;0.62;0.93;0.95;1" dur="20s" repeatCount="indefinite"/>
+    <rect x="740" y="155" width="160" height="115" rx="10" fill="#16281f" stroke="#30d158" stroke-width="2.5"/>
+    <text x="820" y="188" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 3</text>
+    <text x="820" y="210" fill="#30d158" font-size="13" font-weight="700" text-anchor="middle">ISR MEMBER</text>
+    <text x="820" y="234" fill="#9fb0c3" font-size="11" text-anchor="middle">promoted · electable ✓</text>
+  </g>
+
+  <!-- ===== Flows ===== -->
+  <!-- producer -> leader (write flow: on in steady state, off during fail-stop, back after promotion) -->
+  <g>
+    <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.175;0.195;0.60;0.62;1" dur="20s" repeatCount="indefinite"/>
+    <line x1="180" y1="212" x2="260" y2="212" stroke="#3d4f66" stroke-width="1.5"/>
+    <circle r="4.5" fill="#4dabf7">
+      <animateMotion path="M180,212 L260,212" dur="1.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="4.5" fill="#4dabf7">
+      <animateMotion path="M180,212 L260,212" dur="1.2s" begin="0.6s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  <!-- write flow interrupted marker -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.175;0.195;0.60;0.62;1" dur="20s" repeatCount="indefinite"/>
+    <line x1="180" y1="212" x2="260" y2="212" stroke="#ff453a" stroke-width="1.5" stroke-dasharray="4 6" opacity="0.7"/>
+    <text x="220" y="200" fill="#ff453a" font-size="15" font-weight="800" text-anchor="middle">✗</text>
+  </g>
+
+  <!-- leader -> follower 2 replication (visible while broker 2 is in ISR) -->
+  <g>
+    <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.175;0.195;0.80;0.82;1" dur="20s" repeatCount="indefinite"/>
+    <line x1="420" y1="212" x2="500" y2="212" stroke="#3d4f66" stroke-width="1.5"/>
+    <circle r="4.5" fill="#30d158">
+      <animateMotion path="M420,212 L500,212" dur="1.3s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- leader -> observer sync (purple dashed always, turns solid green while promoted) -->
+  <g>
+    <animate attributeName="opacity" values="1;1;0;0;1;1" keyTimes="0;0.60;0.62;0.93;0.95;1" dur="20s" repeatCount="indefinite"/>
+    <path d="M420,262 C 550,335 630,335 745,268" fill="none" stroke="#bf5af2" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.7"/>
+    <circle r="3.5" fill="#bf5af2">
+      <animateMotion path="M420,262 C 550,335 630,335 745,268" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="3.5" fill="#bf5af2">
+      <animateMotion path="M420,262 C 550,335 630,335 745,268" dur="2.2s" begin="1.1s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.60;0.62;0.93;0.95;1" dur="20s" repeatCount="indefinite"/>
+    <path d="M420,262 C 550,335 630,335 745,268" fill="none" stroke="#30d158" stroke-width="1.5"/>
+    <circle r="4.5" fill="#30d158">
+      <animateMotion path="M420,262 C 550,335 630,335 745,268" dur="1.4s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- ===== ISR status strip (y=345) ===== -->
+  <g font-size="16" font-weight="800" text-anchor="middle">
+    <text x="500" y="352" fill="#30d158" opacity="0">ISR = {1, 2} · observer 3 outside — writes flowing
+      <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.175;0.195;1" dur="20s" repeatCount="indefinite"/></text>
+    <text x="500" y="352" fill="#ff453a" opacity="0">ISR = {1} — below min.insync.replicas=2 → producers blocked (fail-stop)
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.175;0.195;0.60;0.62;1" dur="20s" repeatCount="indefinite"/></text>
+    <text x="500" y="352" fill="#30d158" opacity="0">ISR = {1, 3} — observer promoted in → writes resume
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.60;0.62;0.80;0.82;1" dur="20s" repeatCount="indefinite"/></text>
+    <text x="500" y="352" fill="#30d158" opacity="0">ISR = {1, 2, 3} — restarted follower auto-rejoined (native)
+      <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.80;0.82;0.93;0.95;1" dur="20s" repeatCount="indefinite"/></text>
+    <text x="500" y="352" fill="#30d158" opacity="0">ISR = {1, 2} — observer demoted back · steady state restored
+      <animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.93;0.95;1" dur="20s" repeatCount="indefinite"/></text>
+  </g>
+
+  <!-- ===== STEP 2: operator terminal ===== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.40;0.42;0.755;0.775;1" dur="20s" repeatCount="indefinite"/>
+    <rect x="235" y="385" width="530" height="98" rx="8" fill="#0d1420" stroke="#d29922" stroke-width="1.5"/>
+    <circle cx="255" cy="403" r="4.5" fill="#ff453a"/><circle cx="271" cy="403" r="4.5" fill="#d29922"/><circle cx="287" cy="403" r="4.5" fill="#30d158"/>
+    <text x="255" y="433" fill="#e6edf3" font-size="13" font-family="ui-monospace,Menlo,monospace">$ echo "" | sudo tee observer.ids.tmp &amp;&amp; sudo mv observer.ids.tmp observer.ids</text>
+    <text x="255" y="456" fill="#9fb0c3" font-size="11" font-family="ui-monospace,Menlo,monospace"># remove broker 3's id — on ALL surviving brokers + controllers (atomic tmp → mv)</text>
+    <text x="255" y="474" fill="#9fb0c3" font-size="11" font-family="ui-monospace,Menlo,monospace"># that's the whole action: one file edit, zero restarts, zero data movement</text>
+  </g>
+
+  <!-- ===== STEP 3: recovery stopwatch ===== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.57;0.60;0.755;0.775;1" dur="20s" repeatCount="indefinite"/>
+    <circle cx="822" cy="430" r="27" fill="none" stroke="#30d158" stroke-width="2.5"/>
+    <line x1="822" y1="430" x2="822" y2="412" stroke="#30d158" stroke-width="2.5">
+      <animateTransform attributeName="transform" type="rotate" from="0 822 430" to="360 822 430" dur="2s" repeatCount="indefinite"/>
+    </line>
+    <line x1="822" y1="398" x2="822" y2="403" stroke="#30d158" stroke-width="2.5"/>
+    <text x="822" y="487" fill="#30d158" font-size="14" font-weight="800" text-anchor="middle">~9 s from action to recovery</text>
+    <text x="822" y="506" fill="#9fb0c3" font-size="11" text-anchor="middle">5 s file cache + one fetch round-trip (measured ≤10 s)</text>
+  </g>
+
+  <!-- ===== STEP 4: finale ===== -->
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.795;0.815;0.99;1" dur="20s" repeatCount="indefinite"/>
+    <text x="500" y="445" fill="#30d158" font-size="34" font-weight="800" text-anchor="middle">RPO = 0 · leader never changed</text>
+    <text x="500" y="478" fill="#9fb0c3" font-size="13" text-anchor="middle">no acknowledged write was lost · broker 1 led the partition through the whole incident</text>
+  </g>
+
+  <!-- ===== Timeline / progress bar ===== -->
+  <g font-size="10.5" fill="#9fb0c3">
+    <line x1="100" y1="560" x2="900" y2="560" stroke="#3d4f66" stroke-width="2"/>
+    <g stroke="#3d4f66" stroke-width="2">
+      <line x1="100" y1="554" x2="100" y2="566"/><line x1="240" y1="554" x2="240" y2="566"/>
+      <line x1="420" y1="554" x2="420" y2="566"/><line x1="540" y1="554" x2="540" y2="566"/>
+      <line x1="720" y1="554" x2="720" y2="566"/><line x1="900" y1="554" x2="900" y2="566"/>
+    </g>
+    <text x="170" y="582" text-anchor="middle">0 steady</text>
+    <text x="330" y="582" text-anchor="middle">1 AZ lost · fail-stop</text>
+    <text x="480" y="582" text-anchor="middle">2 file edit</text>
+    <text x="630" y="582" text-anchor="middle">3 promoted · writes back</text>
+    <text x="810" y="582" text-anchor="middle">4 AZ back · demote · RPO=0</text>
+    <circle r="6" fill="#4dabf7">
+      <animateMotion path="M100,560 L900,560" dur="20s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- ===== Legend ===== -->
+  <g font-size="11" fill="#9fb0c3">
+    <rect x="100" y="606" width="14" height="14" rx="3" fill="#241f33" stroke="#bf5af2" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="120" y="617">observer</text>
+    <rect x="195" y="606" width="14" height="14" rx="3" fill="#16281f" stroke="#30d158" stroke-width="1.5"/>
+    <text x="215" y="617">ISR member</text>
+    <rect x="305" y="606" width="14" height="14" rx="3" fill="#223044" stroke="#ff9900" stroke-width="2.5"/>
+    <text x="325" y="617">leader</text>
+    <rect x="385" y="606" width="14" height="14" rx="3" fill="#2b1518" stroke="#ff453a" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="405" y="617">failed</text>
+    <circle cx="462" cy="613" r="4.5" fill="#4dabf7"/>
+    <text x="472" y="617">writes</text>
+    <text x="900" y="617" text-anchor="end">evidence: runbooks/scenario-a-az-loss.md · evidence/observer_v3_lifecycle_evidence.md</text>
+  </g>
+</svg>

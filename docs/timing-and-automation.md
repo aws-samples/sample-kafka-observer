@@ -55,6 +55,10 @@ During fail-stop (S1/S4):
 
 Observer promotion and demotion work by **editing a file**. The file change is the **only** human/automation action needed — everything else is Kafka's native ISR machinery:
 
+<p align="center">
+  <img src="diagrams/story-promotion.svg" alt="Animated promotion story — steady state, operator removes id from observer.ids, cache refresh opens canAddReplicaToIsr gate, native ISR expansion pulls the observer in (~4-10 s measured), electable with zero restart and zero data movement" width="100%">
+</p>
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ PROMOTION: observer → electable ISR member                              │
@@ -100,6 +104,16 @@ Observer promotion and demotion work by **editing a file**. The file change is t
 │ preferred, or restart that one broker.                                  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+<p align="center">
+  <img src="diagrams/story-demotion.svg" alt="Animated demotion story — operator adds the id back to observer.ids, isr-expiration tick runs the getOutOfSyncReplicas hook, native ISR shrink pushes the broker out (~9-12 s measured), replication continues as an observer; warning: move leadership first if it is the leader" width="100%">
+</p>
+
+And the third state transition needs **no action at all** — an observer crash (scenario S3) changes nothing for writers, which is exactly why it sits outside ISR:
+
+<p align="center">
+  <img src="diagrams/story-observer-crash.svg" alt="Animated observer-crash story — observer dies, ISR/leader/writes/latency (2.0 ms) all unchanged, observer restarts and catches up on its own, log byte-identical after reconnect; zero impact on writes" width="100%">
+</p>
 
 ### Three operational modes (you choose)
 

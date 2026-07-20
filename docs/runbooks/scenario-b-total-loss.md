@@ -1,5 +1,9 @@
 # Runbook — Scenario B: all primary replicas lost (extreme disaster)
 
+<p align="center">
+  <img src="../diagrams/story-total-loss.svg" alt="Looping story animation — both primaries killed, Leader: none because the un-promoted observer refuses to take over even unclean, operator promotes via file edit plus explicit unclean election, promoted observer elected leader in 9.4 seconds and verified with real writes" width="100%">
+</p>
+
 **When**: both primary AZs (or all ISR members) are down simultaneously. Only the observer survives.
 
 ## Verified behavior (real-machine test, Tokyo)

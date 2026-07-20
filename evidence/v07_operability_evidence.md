@@ -1,6 +1,6 @@
 # v0.7 Operability — 真机验证证据 (Metrics + 审计日志 + auto-promoter 端到端)
 
-- 日期: 2026-07-20 (UTC) · 环境: 东京 loadgen EC2 (54.250.248.165)
+- 日期: 2026-07-20 (UTC) · 环境: Tokyo build host (EC2, m7g.xlarge)
 - 集群: 单机 3 节点 KRaft **combined** (broker,controller), Kafka 3.7.1 + v0.7 patched jars
   - broker 端口 9392/9394/9396, controller 9393/9395/9397, JMX 9992/9994/9996
   - 工作目录 /tmp/kraft-v07, 每节点 -Xmx512m, `replica.lag.time.max.ms=10000`

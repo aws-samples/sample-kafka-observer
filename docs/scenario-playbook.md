@@ -4,6 +4,10 @@ This is the index of all failure and semantics experiments executed against real
 
 ## Availability & election experiments
 
+<p align="center">
+  <img src="diagrams/story-az-loss.svg" alt="Looping story animation — steady state, AZ loss and fail-stop, operator file edit, observer promoted into ISR in about 9 seconds, failed AZ returns and the observer demotes back; RPO 0 and the leader never changed" width="100%">
+</p>
+
 | # | Scenario | Setup | Perturbation | Observed outcome | Evidence / runbook |
 |---|---|---|---|---|---|
 | 1 | **One primary AZ lost** (Scenario A) | ZK 3.7.1, primaries 2@1c+3@1d, observer 1@1a, minISR=2, acks=all | Stop the ISR follower's broker | ISR shrinks below minISR → producers get `NOT_ENOUGH_REPLICAS` (fail-stop, no wrong acks); delete observer id from file → observer joins ISR ≤10 s → writes resume; RPO = 0, zero data movement | [runbook A](runbooks/scenario-a-az-loss.md) · [lifecycle evidence](../evidence/observer_v3_lifecycle_evidence.md) |
@@ -145,6 +149,10 @@ Same size, same md5, same last offset (3 099). No ISR action needed or possible.
 
 ## S4. Both primaries down → observer promotion
 
+<p align="center">
+  <img src="diagrams/story-total-loss.svg" alt="Looping story animation — both primaries killed, Leader: none because the un-promoted observer refuses to take over even unclean, operator promotes via file edit plus explicit unclean election, promoted observer elected leader in 9.4 seconds and verified with real writes" width="100%">
+</p>
+
 The full [runbook-B](runbooks/scenario-b-total-loss.md) disaster flow, with **both** minISR end-games exercised.
 
 **Setup**: topic `sm` (`Replicas: 3,1,2`, observer = 3, minISR = 2), leader = 2, `Isr: 2,1`. Pre-kill proof: leader and observer segment md5 **equal** (`0d5f9552…` on both).
@@ -198,6 +206,10 @@ The promoted replica did **not** appear in the ISR until it had replayed the ent
 **Recovery SOP**: demotion of the now-follower was hot: add 3 back to `observer.ids` → `isr-expiration` shrank it out in **3.5 s**, no restart.
 
 ## S6. Inconsistent `observer.ids` across nodes
+
+<p align="center">
+  <img src="diagrams/story-file-failsafe.svg" alt="Looping story animation, three parallel injections against observer.ids — chmod 000 keeps the last cached value with a WARN, garbage content is dropped by the parser, inconsistent copies are fenced by the controller with INELIGIBLE_REPLICA and self-heal in 5.8 seconds once aligned; the file can never take a broker down (covers S6 and S7)" width="100%">
+</p>
 
 The file is per-node local state — what happens in the window when brokers and controllers disagree?
 

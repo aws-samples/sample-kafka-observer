@@ -4,6 +4,10 @@
   <img src="../diagrams/failure-scenario-a.svg" alt="Scenario A animation — steady state, AZ loss and fail-stop, observer promotion, writes resume with RPO 0" width="100%">
 </p>
 
+<p align="center">
+  <img src="../diagrams/story-az-loss.svg" alt="Looping story animation — steady state, AZ loss and fail-stop, operator file edit, observer promoted into ISR in about 9 seconds, failed AZ returns and the observer demotes back; RPO 0 and the leader never changed" width="100%">
+</p>
+
 **Topology assumed**: primary replicas on a fast AZ pair (e.g. 1c+1d), observer in a third AZ (e.g. 1a). `min.insync.replicas=2`, `acks=all`, `unclean.leader.election.enable=false`.
 
 ## What happens at failure
