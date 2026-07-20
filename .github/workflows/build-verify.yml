@@ -2,17 +2,25 @@
 # build-verify.yml — patch-apply + compile verification across Kafka versions
 #
 # What this proves on every push (and weekly, as a version-drift sentinel):
-#   1. The canonical patch (patches/kafka-3.7.1-zk/observer.patch) applies
-#      cleanly to every supported Kafka version. The five anchor hunks are
-#      verbatim-identical across 3.6.x–3.9.x, so a single patch file covers
-#      the whole ZK-mode range (see docs/multi-version.md).
-#   2. All OBSERVER PATCH markers landed in the source tree (>= 6).
-#   3. The patched :core module actually compiles (compileScala — faster than
-#      :core:jar, catches every Scala-level breakage).
+#   1. The per-mode canonical patch applies cleanly to every supported Kafka
+#      version:
+#        - ZK mode  (3.6.x–3.9.x): patches/kafka-3.7.1-zk/observer.patch —
+#          the five ZK anchor hunks are verbatim-identical across the range,
+#          so one patch file covers it (see docs/multi-version.md).
+#        - KRaft 4.x (4.0.0 / 4.1.0): patches/kafka-4.0.0-kraft/ and
+#          patches/kafka-4.1.0-kraft/observer.patch — pure-KRaft ports of the
+#          3.7.1 combined patch (ZK controller hunks dropped; Kafka 4.0
+#          removed ZooKeeper entirely).
+#   2. All OBSERVER PATCH markers landed in the source tree (per-version
+#      expected count — the KRaft patch adds markers in metadata/ too).
+#   3. The patched modules actually compile (:core:compileScala, plus
+#      :metadata:compileJava for KRaft patches — faster than :jar, catches
+#      every Scala/Java-level breakage).
 #
 # If a future Kafka point release moves an anchor, the weekly cron run fails
 # here first — that is the signal to cut a version-specific patch directory
-# (patches/kafka-<version>-zk/observer.patch).
+# (patches/kafka-<version>-<mode>/observer.patch). tools/check-anchors.sh is
+# the local/offline counterpart of this matrix.
 # =============================================================================
 name: build-verify
 
@@ -38,13 +46,51 @@ permissions:
 
 jobs:
   patch-and-compile:
-    name: "Kafka ${{ matrix.kafka_version }} (ZK mode)"
+    name: "Kafka ${{ matrix.kafka_version }} (${{ matrix.mode }})"
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        kafka_version: ["3.6.2", "3.7.1", "3.8.1", "3.9.1"]
+        # version + patch_path + gradle_tasks triples. ZK-range versions share
+        # the single 3.7.1-zk canonical patch; 4.x versions are KRaft-only and
+        # carry their own patch directory (no ZK controller files exist there).
+        include:
+          - kafka_version: "3.6.2"
+            mode: ZK
+            patch_path: patches/kafka-3.7.1-zk/observer.patch
+            gradle_tasks: ":core:compileScala"
+            min_markers: 8
+          - kafka_version: "3.7.1"
+            mode: ZK
+            patch_path: patches/kafka-3.7.1-zk/observer.patch
+            gradle_tasks: ":core:compileScala"
+            min_markers: 8
+          - kafka_version: "3.7.1"
+            mode: KRaft-combined
+            patch_path: patches/kafka-3.7.1-kraft/observer.patch
+            gradle_tasks: ":core:compileScala :metadata:compileJava"
+            min_markers: 12
+          - kafka_version: "3.8.1"
+            mode: ZK
+            patch_path: patches/kafka-3.7.1-zk/observer.patch
+            gradle_tasks: ":core:compileScala"
+            min_markers: 8
+          - kafka_version: "3.9.1"
+            mode: ZK
+            patch_path: patches/kafka-3.7.1-zk/observer.patch
+            gradle_tasks: ":core:compileScala"
+            min_markers: 8
+          - kafka_version: "4.0.0"
+            mode: KRaft
+            patch_path: patches/kafka-4.0.0-kraft/observer.patch
+            gradle_tasks: ":core:compileScala :metadata:compileJava"
+            min_markers: 10
+          - kafka_version: "4.1.0"
+            mode: KRaft
+            patch_path: patches/kafka-4.1.0-kraft/observer.patch
+            gradle_tasks: ":core:compileScala :metadata:compileJava"
+            min_markers: 10
 
     steps:
       - name: Checkout this repository
@@ -61,34 +107,34 @@ jobs:
           git clone --depth 1 --branch "${{ matrix.kafka_version }}" \
             https://github.com/apache/kafka.git kafka-src
 
-      - name: Apply canonical observer patch (git apply --3way)
+      - name: Apply observer patch (git apply --3way)
         working-directory: kafka-src
         run: |
-          PATCH="$GITHUB_WORKSPACE/patches/kafka-3.7.1-zk/observer.patch"
+          PATCH="$GITHUB_WORKSPACE/${{ matrix.patch_path }}"
           echo "Applying $PATCH to Kafka ${{ matrix.kafka_version }} ..."
           if ! git apply --3way "$PATCH"; then
-            echo "::error::Canonical patch failed to apply on Kafka ${{ matrix.kafka_version }}."
+            echo "::error::Patch ${{ matrix.patch_path }} failed to apply on Kafka ${{ matrix.kafka_version }}."
             echo "::error::An anchor has drifted in this version. Run tools/check-anchors.sh ${{ matrix.kafka_version }}"
-            echo "::error::to see which anchor moved, then cut a version-specific patch:"
-            echo "::error::  patches/kafka-${{ matrix.kafka_version }}-zk/observer.patch"
+            echo "::error::to see which anchor moved, then cut a version-specific patch directory."
             exit 1
           fi
           git status --short
 
-      - name: Verify OBSERVER PATCH markers (>= 6)
+      - name: Verify OBSERVER PATCH markers (>= ${{ matrix.min_markers }})
         working-directory: kafka-src
         run: |
-          MARKERS=$(grep -r "OBSERVER PATCH" core/src/main/scala/ | wc -l | tr -d ' ')
-          echo "OBSERVER PATCH markers found: $MARKERS"
-          if [ "$MARKERS" -lt 6 ]; then
-            echo "::error::Expected >= 6 OBSERVER PATCH markers, found $MARKERS — patch applied incompletely."
+          # KRaft patches add markers under metadata/src/main/java too.
+          MARKERS=$(grep -r "OBSERVER PATCH" core/src/main/scala/ metadata/src/main/java/ | wc -l | tr -d ' ')
+          echo "OBSERVER PATCH markers found: $MARKERS (expected >= ${{ matrix.min_markers }})"
+          if [ "$MARKERS" -lt "${{ matrix.min_markers }}" ]; then
+            echo "::error::Expected >= ${{ matrix.min_markers }} OBSERVER PATCH markers, found $MARKERS — patch applied incompletely."
             exit 1
           fi
 
-      - name: Compile patched :core module (compileScala)
+      - name: Compile patched modules (${{ matrix.gradle_tasks }})
         working-directory: kafka-src
-        run: ./gradlew :core:compileScala --console=plain --no-daemon
+        run: ./gradlew ${{ matrix.gradle_tasks }} --console=plain --no-daemon
 
       - name: Report
         run: |
-          echo "Kafka ${{ matrix.kafka_version }}: patch applies cleanly and :core compiles." >> "$GITHUB_STEP_SUMMARY"
+          echo "Kafka ${{ matrix.kafka_version }} (${{ matrix.mode }}): ${{ matrix.patch_path }} applies cleanly and compiles." >> "$GITHUB_STEP_SUMMARY"

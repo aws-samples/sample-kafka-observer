@@ -9,11 +9,82 @@ the current design. Nothing before v1.0 carries API-stability guarantees.
 
 ## [Unreleased]
 
-- CI: patch-apply + compile verification matrix (Kafka 3.6.2 / 3.7.1 / 3.8.1 / 3.9.1),
-  weekly version-drift sentinel, shellcheck / terraform fmt / python lint
-- `tools/check-anchors.sh` — offline anchor verification against GitHub raw sources
-- v0.4 (planned): KRaft controller-side support in the `metadata` module
-  (design complete and probe-verified, see ROADMAP.md)
+- v0.7 (backlog): metrics (`ObserversInIsrCount`, per-replica observer status),
+  optional auto-promotion policy, promotion/demotion audit log, aws-samples
+  publication readiness (see ROADMAP.md)
+
+## [0.6.0] - 2026-07-20
+
+Kafka 4.0 / 4.1 support (pure KRaft — ZooKeeper is removed upstream in 4.0),
+verified end-to-end on real EC2 clusters (Tokyo, 3 controller-only + 3 broker
+nodes). Raw evidence in `evidence/kafka40_port_evidence.md` and
+`evidence/elr_verification_evidence.md`.
+
+### Added
+
+- **Canonical patch** `patches/kafka-4.0.0-kraft/observer.patch` — port of the
+  3.7.1 combined patch to Kafka 4.0.0: all 8 usable hunks applied with
+  line-number drift only (zero hand edits); the 2 ZK-controller hunks
+  (`PartitionStateMachine.scala`) are dropped because Kafka 4.0 deleted the
+  ZooKeeper controller. Compiles on JDK 17 / Scala 2.13 / Gradle 8.10.2.
+- **Canonical patch** `patches/kafka-4.1.0-kraft/observer.patch` — byte-identical
+  patch content to the 4.0.0 one (hunk offsets only); compiles cleanly on 4.1.0.
+- **CI matrix extended to 7 legs** (`.github/workflows/build-verify.yml`):
+  3.6.2 / 3.7.1 / 3.8.1 / 3.9.1 ZK + 3.7.1 KRaft-combined + 4.0.0 / 4.1.0
+  KRaft, using per-version `include:` triples (version + patch path + gradle
+  tasks); KRaft legs also compile `:metadata:compileJava` and check the
+  controller-side patch markers.
+- **`tools/check-anchors.sh` extended**: new KRaft controller anchors K1–K3
+  (`ReplicationControlManager` initial-ISR / AlterPartition gate /
+  LeaderAcceptor); ZK anchors A4–A5 auto-skip on 4.x (file removed upstream);
+  default matrix now covers 3.6.2–4.1.0.
+- **docs/multi-version.md**: Kafka 4.x differences section (hunk-by-hunk port
+  analysis, ELR compatibility, version guidance).
+
+### Verified capabilities (v0.6.0, Kafka 4.0.0 real cluster)
+
+- Initial-ISR filtering (controller log
+  `Filtered observers [3] from initial ISR [1, 2, 3] -> [1, 2]`)
+- Full sync, byte-identical observer data under acks=all traffic
+- Promotion ~4 s / follower demotion ~12 s, zero restart
+- Preferred election after promotion; promoted observer serves writes
+- Unclean election refusal: kill all ISR members → `Leader: none` (the
+  surviving observer is never elected, even with
+  `unclean.leader.election.enable=true`); recovery with zero data loss
+
+### ELR (KIP-966) compatibility — verified, no code needed
+
+- Observers structurally never enter ELR or LastKnownElr: the ELR candidate
+  set is `ELR ∪ ISR` and observers never enter the ISR. Verified on real
+  clusters on both 4.0.0 (ELR manually enabled via `kafka-features.sh
+  upgrade --feature eligible.leader.replicas.version=1`) and 4.1.0 (ELR
+  default-on for new clusters at 4.1-IV1). The planned
+  `maybePopulateTargetElr` hook from the v0.4 design is therefore
+  unnecessary — the patch touches no ELR code.
+- ELR is complementary: non-observer ISR members that crash enter ELR and
+  recover with a clean election (zero data loss), stacking with the
+  observer's never-unclean-elected guarantee.
+
+### Fixed / clarified
+
+- The suspected missing negation in
+  `PartitionChangeBuilder.canElectLastKnownLeader` (recorded in v0.4 source
+  verification) is a **confirmed upstream bug**, fixed upstream in 4.1.0
+  (KAFKA-19522). It has no observer-election pathway (observers never appear
+  in LastKnownElr); on 4.0.0 with ELR enabled it can mis-elect a fenced
+  ordinary broker. Guidance: use 4.1.0 if you want ELR; keep ELR at its
+  default (off) on 4.0.0, where behavior is equivalent to 3.7.1.
+
+## [0.5.0] - 2026-07-20
+
+KRaft mode support for Kafka 3.7.1 — combined ZK+KRaft canonical patch
+(`patches/kafka-3.7.1-kraft/observer.patch`): broker-side hooks unchanged,
+new controller-side support in the `metadata` module (`ObserverReplicas.java`
++ 3 `ReplicationControlManager` hooks). Full 8-item capability matrix passed
+on real machines in both combined and controller-only topologies — see
+`evidence/kraft_controller_patch_evidence.md` and ROADMAP.md. CI matrix
+(3.6.2–3.9.1 ZK) with weekly version-drift sentinel; `tools/check-anchors.sh`
+offline anchor verification.
 
 ## [0.3.0] - 2026-07-20
 
@@ -77,5 +148,7 @@ m7g.large). Raw evidence in `evidence/`.
   (the native shrink path never removes the leader itself — a safety property,
   not a bug).
 
-[Unreleased]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.3.0...v0.5.0
 [0.3.0]: https://github.com/aws-samples/sample-kafka-observer/releases/tag/v0.3.0
