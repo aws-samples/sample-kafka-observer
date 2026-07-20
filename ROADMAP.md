@@ -18,7 +18,7 @@ Shipped capability (all verified on real EC2 clusters, Tokyo, 3 AZ):
 
 Known limitations (documented, not hidden):
 
-- ZK-mode controller only notifies ISR members on topic creation → an observer discovers a **new** topic's assignment only after a restart or controller failover. Existing topics unaffected. (KRaft mode should not have this issue — brokers read the metadata log.)
+- ZK-mode controller only notifies ISR members on topic creation → **even a running observer never learns a new topic's assignment** (no partition directory, no fetch; promotion would fail) until its next restart or a controller failover. Existing topics unaffected. Operational rule: restart the observer once after creating topics that span it. (KRaft mode verified free of this issue — brokers read the metadata log.)
 - Observer list file must be identical on all brokers; inconsistency window is bounded (rollout + 5 s) but should be pushed by a single script with checksum verification.
 - Demoting a broker that is currently leader requires moving the leader first (the native shrink path never removes the leader itself — this is a safety property, not a bug).
 

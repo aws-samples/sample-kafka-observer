@@ -1,0 +1,105 @@
+# =============================================================================
+# sample-kafka-observer — local verification cluster
+#
+#   1x ZooKeeper (official image) + 3x patched Kafka brokers (ZK mode).
+#   broker1 starts as an OBSERVER (its id is in ./observer.ids).
+#
+# The image is built ONCE (service kafka1 owns the build) and reused by all
+# three brokers. First build takes ~10-20 min (Gradle compiles patched Kafka
+# from source); subsequent `up` calls reuse the cached image.
+#
+# Promote / demote WITHOUT restarting anything:
+#   ./observer.ids is bind-mounted into every broker at /opt/kafka/observer.ids.
+#   Edit the file on the host; the patch re-reads it within 5 seconds.
+#     promote broker1:  echo '' > observer.ids     (or remove the line "1")
+#     demote  broker1:  echo '1' > observer.ids
+#
+# Host client access: localhost:19092 / 19093 / 19094 (any one works as
+# bootstrap; 19093/19094 are safest since broker1 is an observer).
+# =============================================================================
+
+x-kafka-common: &kafka-common
+  image: kafka-observer:3.7.1
+  networks: [kafka-net]
+  volumes:
+    # Host file == broker file. Editing it on the host is the whole demo.
+    - ./observer.ids:/opt/kafka/observer.ids
+  depends_on:
+    zookeeper:
+      condition: service_healthy
+  restart: unless-stopped
+
+x-kafka-healthcheck: &kafka-healthcheck
+  # broker-side check via the INTERNAL listener; generous start_period because
+  # first boot creates internal topics.
+  interval: 10s
+  timeout: 10s
+  retries: 12
+  start_period: 30s
+
+services:
+  zookeeper:
+    image: zookeeper:3.8
+    container_name: zookeeper
+    networks: [kafka-net]
+    environment:
+      ZOO_4LW_COMMANDS_WHITELIST: "ruok,srvr,stat"
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc -w 2 localhost 2181 | grep -q imok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  kafka1:
+    <<: *kafka-common
+    build:
+      # Context is the repo root so the Dockerfile can COPY patches/.
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        KAFKA_VERSION: "3.7.1"
+    container_name: kafka1
+    environment:
+      BROKER_ID: 1                # <-- listed in ./observer.ids => observer
+      ZOOKEEPER_CONNECT: zookeeper:2181
+      EXTERNAL_PORT: 19092
+      CONTAINER_NAME: kafka1
+    ports:
+      - "19092:19092"
+    healthcheck:
+      <<: *kafka-healthcheck
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka1:9092 >/dev/null 2>&1"]
+
+  kafka2:
+    <<: *kafka-common
+    container_name: kafka2
+    environment:
+      BROKER_ID: 2
+      ZOOKEEPER_CONNECT: zookeeper:2181
+      EXTERNAL_PORT: 19093
+      CONTAINER_NAME: kafka2
+    ports:
+      - "19093:19093"
+    healthcheck:
+      <<: *kafka-healthcheck
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka2:9092 >/dev/null 2>&1"]
+
+  kafka3:
+    <<: *kafka-common
+    container_name: kafka3
+    environment:
+      BROKER_ID: 3
+      ZOOKEEPER_CONNECT: zookeeper:2181
+      EXTERNAL_PORT: 19094
+      CONTAINER_NAME: kafka3
+    ports:
+      - "19094:19094"
+    healthcheck:
+      <<: *kafka-healthcheck
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka3:9092 >/dev/null 2>&1"]
+
+networks:
+  kafka-net:
+    driver: bridge

@@ -59,7 +59,7 @@ Notes:
 
 ## ⚠️ Known limitation — ZK mode, new topics
 
-In ZooKeeper mode, the controller sends `LeaderAndIsr` only to ISR members at **topic creation**. An observer (excluded from the initial ISR by design) therefore does not learn about a *new* topic's assignment until its next restart or a controller failover — until then it does not fetch that topic.
+In ZooKeeper mode, the controller sends `LeaderAndIsr` only to ISR members at **topic creation**. An observer (excluded from the initial ISR by design) therefore never receives a *new* topic's assignment — **even while running**: the partition directory does not appear on disk, no fetching happens, and a promotion attempted in this state would fail. The observer learns the assignment only on its next restart or a controller failover. (Docker-demo verified.)
 
 - Existing topics: unaffected (assignments load from ZK at startup).
 - Workaround for new topics: restart the observer broker once after creating topics, or create topics before designating the broker as observer.

@@ -1,0 +1,24 @@
+[project]
+name = "kafka-observer-tests"
+version = "0.3.0"
+description = "Integration tests for the Kafka observer-replica patch (docker compose or AWS/terraform backends)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "pytest>=8.0",
+    "pytest-timeout>=2.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+addopts = "-ra --strict-markers"
+# Global safety net: no single test may hang forever waiting on a dead cluster.
+timeout = 900
+timeout_method = "thread"
+log_cli = true
+log_cli_level = "INFO"
+
+[tool.uv]
+# Test-only project; no build backend needed (run with `uv run pytest`).
+package = false

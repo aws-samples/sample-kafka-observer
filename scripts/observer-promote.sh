@@ -28,6 +28,7 @@ YES=0
 while getopts "b:s:H:f:t:y" o; do case $o in
   b) BROKER=$OPTARG;; s) BOOT=$OPTARG;; H) HOSTS=$OPTARG;;
   f) FILE=$OPTARG;; t) TOPIC=$OPTARG;; y) YES=1;;
+  *) echo "Usage: $0 -b <broker_id> -s <bootstrap> -H \"host1 host2 host3\" [-f file] [-t topic] [-y]" >&2; exit 2;;
 esac; done
 : "${BROKER:?-b broker_id required}" "${BOOT:?-s bootstrap required}" "${HOSTS:?-H hosts required}"
 

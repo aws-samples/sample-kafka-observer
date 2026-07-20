@@ -1,0 +1,5 @@
+# Broker ids listed here are OBSERVERS (never join ISR, never lead).
+# Edit this file on the host — all brokers re-read it within 5 seconds.
+#   promote broker1: delete the "1" line below
+#   demote  broker1: add it back
+1
