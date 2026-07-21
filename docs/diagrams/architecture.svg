@@ -1,118 +1,96 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1480 780" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif" role="img" aria-label="Kafka Observer Replicas — sync everything, never join the ISR">
-<title>Kafka Observer Replicas — sync everything, never join the ISR</title>
-<defs>
-<pattern id="grid" width="34" height="34" patternUnits="userSpaceOnUse"><path d="M34 0 H0 V34" fill="none" stroke="#EAEFF6" stroke-width="1"/></pattern>
-<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1 L9 5 L1 9" fill="none" stroke="context-stroke" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></marker>
-<style>@media (prefers-reduced-motion: no-preference){.flow{stroke-dasharray:6 6;animation:dm .8s linear infinite}}@keyframes dm{to{stroke-dashoffset:-12}}</style>
-</defs>
-<rect width="1480" height="780" fill="#FBFCFE"/><rect width="1480" height="780" fill="url(#grid)"/>
-<text x="40" y="46" font-size="21" font-weight="800" fill="#16202E">Kafka Observer Replicas — sync everything, never join the ISR</text>
-<text x="40" y="68" font-size="12" fill="#5A6B7B">acks=all waits only for the ISR · observer byte-copies the log in a third AZ · promotion = edit one file, ≤10 s, zero restart, zero data movement</text>
-<rect x="330" y="70" width="810" height="640" rx="12" fill="rgba(0,164,166,0.045)" stroke="#00A4A6" stroke-width="1.5" stroke-dasharray="9 5"/>
-<text x="348" y="88" font-size="11" font-weight="700" fill="#0B7E7F">AWS Cloud · ap-northeast-1 · one Kafka cluster (3 AZs)</text>
-<rect x="360" y="110" width="700" height="330" rx="12" fill="rgba(231,21,123,0.04)" stroke="#E7157B" stroke-width="1.5" stroke-dasharray="3 4"/>
-<text x="376" y="128" font-size="11" font-weight="700" fill="#B21667">ISR — acks=all quorum · HW = min(LEO of ISR) · leader candidates</text>
-<rect x="790" y="470" width="220" height="160" rx="12" fill="rgba(140,79,255,0.06)" stroke="#8C4FFF" stroke-width="1.5" stroke-dasharray="6 4"/>
-<text x="800" y="620" font-size="11" font-weight="700" fill="#7C3AED">third AZ / remote</text>
-<path class="flow" d="M 123.0 340.0 L 447.0 340.0" fill="none" stroke="#1D4ED8" stroke-width="2" marker-end="url(#ah)"/>
-<path class="flow" d="M 493.0 340.0 L 680.0 340.0 L 680.0 190.0 L 877.0 190.0" fill="none" stroke="#1D4ED8" stroke-width="2" marker-end="url(#ah)"/>
-<path class="flow" d="M 470.0 363.0 L 470.0 540.0 L 877.0 540.0" fill="none" stroke="#0369A1" stroke-width="2" marker-end="url(#ah)"/>
-<path class="flow" d="M 1307.0 540.0 L 923.0 540.0" fill="none" stroke="#15803D" stroke-width="2" marker-end="url(#ah)"/>
-<rect x="228" y="317" width="114" height="14" rx="3" fill="#FBFCFE" opacity="0.92"/>
-<text x="285" y="327" text-anchor="middle" font-size="9.5" fill="#48586a">acks=all produce</text>
-<rect x="716" y="167" width="107" height="14" rx="3" fill="#FBFCFE" opacity="0.92"/>
-<text x="770" y="177" text-anchor="middle" font-size="9.5" fill="#48586a">replicate + ack</text>
-<rect x="435" y="517" width="411" height="14" rx="3" fill="#FBFCFE" opacity="0.92"/>
-<text x="640" y="527" text-anchor="middle" font-size="9.5" fill="#48586a">observer fetch — byte-identical (offsets · PID · txn markers)</text>
-<rect x="1123" y="513" width="114" height="14" rx="3" fill="#FBFCFE" opacity="0.92"/>
-<text x="1180" y="523" text-anchor="middle" font-size="9.5" fill="#48586a">promote / demote</text>
-<circle r="4" fill="#1D4ED8"><animateMotion dur="2.4s" begin="0.00s" repeatCount="indefinite" path="M 123.0 340.0 L 447.0 340.0"/></circle>
-<circle r="4" fill="#1D4ED8"><animateMotion dur="2.4s" begin="1.20s" repeatCount="indefinite" path="M 493.0 340.0 L 680.0 340.0 L 680.0 190.0 L 877.0 190.0"/></circle>
-<circle r="3.4" fill="#0F766E"><animateMotion dur="2.6s" begin="0.00s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear" path="M 493.0 340.0 L 680.0 340.0 L 680.0 190.0 L 877.0 190.0"/></circle>
-<circle r="3.4" fill="#0F766E"><animateMotion dur="2.6s" begin="1.30s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear" path="M 123.0 340.0 L 447.0 340.0"/></circle>
-<circle r="4" fill="#0369A1"><animateMotion dur="3.0s" begin="0.00s" repeatCount="indefinite" path="M 470.0 363.0 L 470.0 540.0 L 877.0 540.0"/></circle>
-<circle r="4" fill="#15803D"><animateMotion dur="2.2s" begin="0.00s" repeatCount="indefinite" path="M 1307.0 540.0 L 923.0 540.0"/></circle>
-<rect x="77.0" y="317.0" width="46" height="46" rx="8" fill="#64748B"/><circle cx="100" cy="340" r="7" fill="none" stroke="#fff" stroke-width="2.4"/><circle cx="100" cy="340" r="1.8" fill="#fff"/><text x="100" y="378" text-anchor="middle" font-size="13" font-weight="700" fill="#16202E">Producers</text><text x="100" y="391" text-anchor="middle" font-size="9.5" fill="#5A6B7B">acks=all · EOS / txn</text>
-<g transform="translate(447.00,317.00) scale(0.5750)">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 560" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif" role="img" aria-label="Production topology: RF4 — 3 ISR brokers across 3 AZs plus 1 observer in a remote AZ/DC">
+  <title>Kafka Observer Replicas — production topology (RF4: 3 ISR + 1 observer)</title>
+  <defs>
+    <marker id="arrG" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto"><path d="M0,0 L8,3.5 L0,7 Z" fill="#30d158"/></marker>
+    <marker id="arrP" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto"><path d="M0,0 L8,3.5 L0,7 Z" fill="#bf5af2"/></marker>
+    <marker id="arrB" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto"><path d="M0,0 L8,3.5 L0,7 Z" fill="#2997ff"/></marker>
+  </defs>
+  <rect width="1000" height="560" fill="#1a2332"/>
 
-    
-    
-    
-    <defs>
-        <linearGradient x1="0%" y1="100%" x2="100%" y2="0%" id="ec2__linearGradient-1">
-            <stop stop-color="#C8511B" offset="0%"></stop>
-            <stop stop-color="#FF9900" offset="100%"></stop>
-        </linearGradient>
-    </defs>
-    <g id="ec2__Icon-Architecture/64/Arch_Amazon-EC2_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <g id="ec2__Icon-Architecture-BG/64/Compute" fill="#ED7100">
-            <rect id="ec2__Rectangle" x="0" y="0" width="80" height="80"></rect>
-        </g>
-        <path d="M27,53 L52,53 L52,28 L27,28 L27,53 Z M54,28 L58,28 L58,30 L54,30 L54,34 L58,34 L58,36 L54,36 L54,39 L58,39 L58,41 L54,41 L54,45 L58,45 L58,47 L54,47 L54,51 L58,51 L58,53 L54,53 L54,53.136 C54,54.164 53.164,55 52.136,55 L52,55 L52,59 L50,59 L50,55 L46,55 L46,59 L44,59 L44,55 L41,55 L41,59 L39,59 L39,55 L35,55 L35,59 L33,59 L33,55 L29,55 L29,59 L27,59 L27,55 L26.864,55 C25.836,55 25,54.164 25,53.136 L25,53 L22,53 L22,51 L25,51 L25,47 L22,47 L22,45 L25,45 L25,41 L22,41 L22,39 L25,39 L25,36 L22,36 L22,34 L25,34 L25,30 L22,30 L22,28 L25,28 L25,27.864 C25,26.836 25.836,26 26.864,26 L27,26 L27,22 L29,22 L29,26 L33,26 L33,22 L35,22 L35,26 L39,26 L39,22 L41,22 L41,26 L44,26 L44,22 L46,22 L46,26 L50,26 L50,22 L52,22 L52,26 L52.136,26 C53.164,26 54,26.836 54,27.864 L54,28 Z M41,65.876 C41,65.944 40.944,66 40.876,66 L14.124,66 C14.056,66 14,65.944 14,65.876 L14,39.124 C14,39.056 14.056,39 14.124,39 L20,39 L20,37 L14.124,37 C12.953,37 12,37.953 12,39.124 L12,65.876 C12,67.047 12.953,68 14.124,68 L40.876,68 C42.047,68 43,67.047 43,65.876 L43,61 L41,61 L41,65.876 Z M68,14.124 L68,40.876 C68,42.047 67.047,43 65.876,43 L60,43 L60,41 L65.876,41 C65.944,41 66,40.944 66,40.876 L66,14.124 C66,14.056 65.944,14 65.876,14 L39.124,14 C39.056,14 39,14.056 39,14.124 L39,20 L37,20 L37,14.124 C37,12.953 37.953,12 39.124,12 L65.876,12 C67.047,12 68,12.953 68,14.124 L68,14.124 Z" id="ec2__Amazon-EC2_Icon_64_Squid" fill="#FFFFFF"></path>
-    </g>
-</g><text x="470" y="378" text-anchor="middle" font-size="13" font-weight="700" fill="#16202E">Leader — broker 2</text><text x="470" y="391" text-anchor="middle" font-size="9.5" fill="#5A6B7B">AZ-c</text>
-<g transform="translate(877.00,167.00) scale(0.5750)">
+  <!-- Title -->
+  <text x="500" y="32" fill="#fff" font-size="18" font-weight="700" text-anchor="middle">Production topology — RF4: 3 ISR members (3 AZs) + 1 observer (remote)</text>
+  <text x="500" y="52" fill="#8b95a7" font-size="12" text-anchor="middle">acks=all waits only for the ISR · observer byte-copies the log · lose 1 AZ → writes continue · lose 2 AZs → promote observer</text>
 
-    
-    
-    
-    <defs>
-        <linearGradient x1="0%" y1="100%" x2="100%" y2="0%" id="ec2__linearGradient-1">
-            <stop stop-color="#C8511B" offset="0%"></stop>
-            <stop stop-color="#FF9900" offset="100%"></stop>
-        </linearGradient>
-    </defs>
-    <g id="ec2__Icon-Architecture/64/Arch_Amazon-EC2_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <g id="ec2__Icon-Architecture-BG/64/Compute" fill="#ED7100">
-            <rect id="ec2__Rectangle" x="0" y="0" width="80" height="80"></rect>
-        </g>
-        <path d="M27,53 L52,53 L52,28 L27,28 L27,53 Z M54,28 L58,28 L58,30 L54,30 L54,34 L58,34 L58,36 L54,36 L54,39 L58,39 L58,41 L54,41 L54,45 L58,45 L58,47 L54,47 L54,51 L58,51 L58,53 L54,53 L54,53.136 C54,54.164 53.164,55 52.136,55 L52,55 L52,59 L50,59 L50,55 L46,55 L46,59 L44,59 L44,55 L41,55 L41,59 L39,59 L39,55 L35,55 L35,59 L33,59 L33,55 L29,55 L29,59 L27,59 L27,55 L26.864,55 C25.836,55 25,54.164 25,53.136 L25,53 L22,53 L22,51 L25,51 L25,47 L22,47 L22,45 L25,45 L25,41 L22,41 L22,39 L25,39 L25,36 L22,36 L22,34 L25,34 L25,30 L22,30 L22,28 L25,28 L25,27.864 C25,26.836 25.836,26 26.864,26 L27,26 L27,22 L29,22 L29,26 L33,26 L33,22 L35,22 L35,26 L39,26 L39,22 L41,22 L41,26 L44,26 L44,22 L46,22 L46,26 L50,26 L50,22 L52,22 L52,26 L52.136,26 C53.164,26 54,26.836 54,27.864 L54,28 Z M41,65.876 C41,65.944 40.944,66 40.876,66 L14.124,66 C14.056,66 14,65.944 14,65.876 L14,39.124 C14,39.056 14.056,39 14.124,39 L20,39 L20,37 L14.124,37 C12.953,37 12,37.953 12,39.124 L12,65.876 C12,67.047 12.953,68 14.124,68 L40.876,68 C42.047,68 43,67.047 43,65.876 L43,61 L41,61 L41,65.876 Z M68,14.124 L68,40.876 C68,42.047 67.047,43 65.876,43 L60,43 L60,41 L65.876,41 C65.944,41 66,40.944 66,40.876 L66,14.124 C66,14.056 65.944,14 65.876,14 L39.124,14 C39.056,14 39,14.056 39,14.124 L39,20 L37,20 L37,14.124 C37,12.953 37.953,12 39.124,12 L65.876,12 C67.047,12 68,12.953 68,14.124 L68,14.124 Z" id="ec2__Amazon-EC2_Icon_64_Squid" fill="#FFFFFF"></path>
-    </g>
-</g><text x="900" y="228" text-anchor="middle" font-size="13" font-weight="700" fill="#16202E">ISR follower — broker 3</text><text x="900" y="241" text-anchor="middle" font-size="9.5" fill="#5A6B7B">AZ-d</text>
-<g transform="translate(877.00,517.00) scale(0.5750)">
+  <!-- Producer -->
+  <rect x="430" y="70" width="140" height="42" rx="8" fill="#0f1622" stroke="#2997ff" stroke-width="2"/>
+  <text x="500" y="96" fill="#2997ff" font-size="14" font-weight="600" text-anchor="middle">Producer</text>
 
-    
-    
-    
-    <defs>
-        <linearGradient x1="0%" y1="100%" x2="100%" y2="0%" id="ec2__linearGradient-1">
-            <stop stop-color="#C8511B" offset="0%"></stop>
-            <stop stop-color="#FF9900" offset="100%"></stop>
-        </linearGradient>
-    </defs>
-    <g id="ec2__Icon-Architecture/64/Arch_Amazon-EC2_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <g id="ec2__Icon-Architecture-BG/64/Compute" fill="#ED7100">
-            <rect id="ec2__Rectangle" x="0" y="0" width="80" height="80"></rect>
-        </g>
-        <path d="M27,53 L52,53 L52,28 L27,28 L27,53 Z M54,28 L58,28 L58,30 L54,30 L54,34 L58,34 L58,36 L54,36 L54,39 L58,39 L58,41 L54,41 L54,45 L58,45 L58,47 L54,47 L54,51 L58,51 L58,53 L54,53 L54,53.136 C54,54.164 53.164,55 52.136,55 L52,55 L52,59 L50,59 L50,55 L46,55 L46,59 L44,59 L44,55 L41,55 L41,59 L39,59 L39,55 L35,55 L35,59 L33,59 L33,55 L29,55 L29,59 L27,59 L27,55 L26.864,55 C25.836,55 25,54.164 25,53.136 L25,53 L22,53 L22,51 L25,51 L25,47 L22,47 L22,45 L25,45 L25,41 L22,41 L22,39 L25,39 L25,36 L22,36 L22,34 L25,34 L25,30 L22,30 L22,28 L25,28 L25,27.864 C25,26.836 25.836,26 26.864,26 L27,26 L27,22 L29,22 L29,26 L33,26 L33,22 L35,22 L35,26 L39,26 L39,22 L41,22 L41,26 L44,26 L44,22 L46,22 L46,26 L50,26 L50,22 L52,22 L52,26 L52.136,26 C53.164,26 54,26.836 54,27.864 L54,28 Z M41,65.876 C41,65.944 40.944,66 40.876,66 L14.124,66 C14.056,66 14,65.944 14,65.876 L14,39.124 C14,39.056 14.056,39 14.124,39 L20,39 L20,37 L14.124,37 C12.953,37 12,37.953 12,39.124 L12,65.876 C12,67.047 12.953,68 14.124,68 L40.876,68 C42.047,68 43,67.047 43,65.876 L43,61 L41,61 L41,65.876 Z M68,14.124 L68,40.876 C68,42.047 67.047,43 65.876,43 L60,43 L60,41 L65.876,41 C65.944,41 66,40.944 66,40.876 L66,14.124 C66,14.056 65.944,14 65.876,14 L39.124,14 C39.056,14 39,14.056 39,14.124 L39,20 L37,20 L37,14.124 C37,12.953 37.953,12 39.124,12 L65.876,12 C67.047,12 68,12.953 68,14.124 L68,14.124 Z" id="ec2__Amazon-EC2_Icon_64_Squid" fill="#FFFFFF"></path>
-    </g>
-</g><text x="900" y="578" text-anchor="middle" font-size="13" font-weight="700" fill="#16202E">Observer — broker 1</text><text x="900" y="591" text-anchor="middle" font-size="9.5" fill="#5A6B7B">AZ-a · never in ISR</text>
-<g transform="translate(1307.00,517.00) scale(0.5750)">
+  <!-- ISR box around three AZs -->
+  <rect x="40" y="140" width="700" height="290" rx="14" fill="rgba(48,209,88,0.05)" stroke="#30d158" stroke-width="2" stroke-dasharray="8 5"/>
+  <text x="60" y="164" fill="#30d158" font-size="13" font-weight="700">ISR — acks=all quorum · HW = min(LEO of ISR) · leader candidates come from here</text>
 
-    
-    
-    
-    <defs>
-        <linearGradient x1="0%" y1="100%" x2="100%" y2="0%" id="appconfig__linearGradient-1">
-            <stop stop-color="#B0084D" offset="0%"></stop>
-            <stop stop-color="#FF4F8B" offset="100%"></stop>
-        </linearGradient>
-    </defs>
-    <g id="appconfig__Icon-Architecture/64/Arch_AWS-App-Config_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <g id="appconfig__Icon-Architecture-BG/64/Management-Governance" fill="url(#appconfig__linearGradient-1)">
-            <rect id="appconfig__Rectangle" x="0" y="0" width="80" height="80"></rect>
-        </g>
-        <path d="M50.871,37.366 C50.871,42.053 47.058,45.866 42.371,45.866 C37.684,45.866 33.871,42.053 33.871,37.366 C33.871,32.679 37.684,28.866 42.371,28.866 C47.058,28.866 50.871,32.679 50.871,37.366 L50.871,37.366 Z M52.871,37.366 C52.871,31.576 48.161,26.866 42.371,26.866 C36.581,26.866 31.871,31.576 31.871,37.366 C31.871,43.156 36.581,47.866 42.371,47.866 C48.161,47.866 52.871,43.156 52.871,37.366 L52.871,37.366 Z M47.91,62.418 C48.1,62.218 48.197,61.949 48.182,61.674 L47.999,58.473 C49.846,57.979 51.611,57.248 53.265,56.291 L55.4,58.685 C55.583,58.89 55.843,59.011 56.118,59.019 C56.394,59.042 56.659,58.921 56.853,58.726 L63.702,51.878 C63.896,51.683 64.003,51.417 63.995,51.142 C63.987,50.867 63.866,50.608 63.661,50.425 L61.259,48.283 C62.214,46.631 62.944,44.868 63.437,43.023 L66.649,43.207 C66.934,43.223 67.193,43.124 67.393,42.936 C67.594,42.747 67.707,42.484 67.707,42.209 L67.707,32.524 C67.707,32.249 67.594,31.986 67.393,31.797 C67.194,31.608 66.921,31.51 66.65,31.525 L63.434,31.708 C62.941,29.867 62.211,28.106 61.255,26.453 L63.661,24.307 C63.866,24.124 63.987,23.865 63.995,23.589 C64.003,23.314 63.896,23.048 63.702,22.854 L56.853,16.006 C56.659,15.81 56.392,15.696 56.118,15.713 C55.843,15.721 55.584,15.842 55.4,16.047 L53.247,18.46 C51.597,17.505 49.838,16.776 47.999,16.284 L48.182,13.057 C48.197,12.783 48.1,12.513 47.91,12.314 C47.722,12.114 47.459,12 47.183,12 L37.499,12 C37.224,12 36.961,12.114 36.772,12.314 C36.583,12.513 36.485,12.783 36.501,13.057 L36.683,16.282 C34.844,16.773 33.084,17.502 31.432,18.456 L29.282,16.047 C29.099,15.842 28.84,15.721 28.564,15.713 C28.295,15.698 28.023,15.811 27.829,16.006 L20.98,22.854 C20.786,23.048 20.68,23.314 20.687,23.589 C20.695,23.864 20.816,24.124 21.021,24.307 L23.433,26.458 C22.476,28.109 21.745,29.869 21.251,31.708 L18.032,31.525 C17.759,31.509 17.488,31.608 17.289,31.797 C17.089,31.986 16.975,32.249 16.975,32.524 L16.975,42.209 C16.975,42.484 17.089,42.747 17.289,42.936 C17.489,43.125 17.761,43.229 18.034,43.207 L21.985,42.976 L21.868,40.979 L18.975,41.149 L18.975,33.582 L21.966,33.752 C22.454,33.776 22.889,33.451 22.998,32.975 C23.496,30.783 24.358,28.704 25.563,26.799 C25.824,26.386 25.748,25.844 25.384,25.518 L23.143,23.519 L28.495,18.168 L30.492,20.407 C30.817,20.771 31.359,20.846 31.771,20.586 C33.678,19.385 35.756,18.525 37.949,18.03 C38.427,17.922 38.756,17.485 38.727,16.997 L38.558,14 L46.125,14 L45.955,16.999 C45.927,17.487 46.256,17.924 46.732,18.032 C48.925,18.527 51.002,19.388 52.906,20.591 C53.317,20.849 53.86,20.776 54.186,20.411 L56.187,18.168 L61.539,23.519 L59.304,25.513 C58.939,25.839 58.863,26.38 59.124,26.793 C60.328,28.7 61.19,30.78 61.686,32.974 C61.795,33.451 62.237,33.776 62.719,33.752 L65.707,33.582 L65.707,41.15 L62.723,40.979 C62.237,40.954 61.798,41.28 61.689,41.757 C61.192,43.956 60.331,46.037 59.128,47.942 C58.867,48.355 58.943,48.897 59.308,49.222 L61.539,51.212 L56.188,56.564 L54.204,54.34 C53.878,53.973 53.336,53.899 52.924,54.16 C51.017,55.365 48.934,56.228 46.732,56.725 C46.256,56.833 45.927,57.27 45.955,57.758 L46.125,60.731 L38.591,60.731 L38.727,59.185 L36.735,59.009 L36.503,61.643 C36.478,61.923 36.572,62.199 36.762,62.407 C36.951,62.614 37.219,62.731 37.499,62.731 L47.183,62.731 C47.459,62.731 47.722,62.618 47.91,62.418 L47.91,62.418 Z M37.101,54.554 L35.726,53.102 L23.215,64.956 L24.59,66.408 L37.101,54.554 Z M25.246,46.654 L23.875,45.198 L12.68,55.735 L14.051,57.191 L25.246,46.654 Z M13.414,67.706 L12,66.292 L31.756,46.536 L33.17,47.95 L13.414,67.706 Z" id="appconfig__AWS-App-Config_Icon_64_Squid" fill="#FFFFFF"></path>
-    </g>
-</g><text x="1330" y="578" text-anchor="middle" font-size="13" font-weight="700" fill="#16202E">observer.ids</text><text x="1330" y="591" text-anchor="middle" font-size="9.5" fill="#5A6B7B">file · 5 s cache</text>
-<circle cx="285" cy="340" r="9" fill="#232F3E"/><text x="285" y="343" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">1</text>
-<circle cx="685" cy="265" r="9" fill="#232F3E"/><text x="685" y="268" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">2</text>
-<circle cx="685" cy="440" r="9" fill="#232F3E"/><text x="685" y="443" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">3</text>
-<circle cx="1115" cy="540" r="9" fill="#232F3E"/><text x="1115" y="543" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">4</text>
-<text x="40" y="690" font-size="11" font-weight="700" fill="#16202E">Flows</text>
-<circle cx="92" cy="686" r="5" fill="#1D4ED8"/><text x="102" y="690" font-size="10.5" fill="#5A6B7B">request →</text>
-<circle cx="185" cy="686" r="5" fill="#0F766E"/><text x="195" y="690" font-size="10.5" fill="#5A6B7B">reply ←</text>
-<circle cx="264" cy="686" r="5" fill="#0369A1"/><text x="274" y="690" font-size="10.5" fill="#5A6B7B">tools/memory</text>
-<circle cx="378" cy="686" r="5" fill="#15803D"/><text x="388" y="690" font-size="10.5" fill="#5A6B7B">scheduling</text>
-<text x="40" y="712" font-size="10" fill="#5A6B7B">① acks=all produce → ② ISR replicate + ack (HW = min LEO of ISR — never waits for the observer) · ③ observer fetches the same byte stream, stays out of ISR · ④ remove its id from observer.ids → native ISR expansion promotes it</text>
+  <!-- AZ-a: broker1 leader -->
+  <rect x="70" y="190" width="190" height="200" rx="10" fill="#0f1622" stroke="#3a4556" stroke-width="1.5"/>
+  <text x="165" y="214" fill="#8b95a7" font-size="12" font-weight="600" text-anchor="middle">AZ-a</text>
+  <rect x="95" y="230" width="140" height="70" rx="8" fill="#1a2332" stroke="#ff9900" stroke-width="3"/>
+  <text x="165" y="258" fill="#ff9900" font-size="14" font-weight="700" text-anchor="middle">broker 1</text>
+  <text x="165" y="280" fill="#ff9900" font-size="11" text-anchor="middle">LEADER</text>
+  <rect x="115" y="320" width="100" height="40" rx="6" fill="#0f1622" stroke="#5a6b7b" stroke-width="1"/>
+  <text x="165" y="345" fill="#8b95a7" font-size="10" text-anchor="middle">controller 1</text>
+
+  <!-- AZ-b: broker2 -->
+  <rect x="295" y="190" width="190" height="200" rx="10" fill="#0f1622" stroke="#3a4556" stroke-width="1.5"/>
+  <text x="390" y="214" fill="#8b95a7" font-size="12" font-weight="600" text-anchor="middle">AZ-b</text>
+  <rect x="320" y="230" width="140" height="70" rx="8" fill="#1a2332" stroke="#30d158" stroke-width="2.5"/>
+  <text x="390" y="258" fill="#30d158" font-size="14" font-weight="700" text-anchor="middle">broker 2</text>
+  <text x="390" y="280" fill="#30d158" font-size="11" text-anchor="middle">ISR follower</text>
+  <rect x="340" y="320" width="100" height="40" rx="6" fill="#0f1622" stroke="#5a6b7b" stroke-width="1"/>
+  <text x="390" y="345" fill="#8b95a7" font-size="10" text-anchor="middle">controller 2</text>
+
+  <!-- AZ-c: broker3 -->
+  <rect x="520" y="190" width="190" height="200" rx="10" fill="#0f1622" stroke="#3a4556" stroke-width="1.5"/>
+  <text x="615" y="214" fill="#8b95a7" font-size="12" font-weight="600" text-anchor="middle">AZ-c</text>
+  <rect x="545" y="230" width="140" height="70" rx="8" fill="#1a2332" stroke="#30d158" stroke-width="2.5"/>
+  <text x="615" y="258" fill="#30d158" font-size="14" font-weight="700" text-anchor="middle">broker 3</text>
+  <text x="615" y="280" fill="#30d158" font-size="11" text-anchor="middle">ISR follower</text>
+  <rect x="565" y="320" width="100" height="40" rx="6" fill="#0f1622" stroke="#5a6b7b" stroke-width="1"/>
+  <text x="615" y="345" fill="#8b95a7" font-size="10" text-anchor="middle">controller 3</text>
+
+  <!-- Remote AZ/DC: broker4 observer (OUTSIDE ISR box) -->
+  <rect x="775" y="190" width="200" height="200" rx="10" fill="rgba(191,90,242,0.06)" stroke="#bf5af2" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="875" y="214" fill="#bf5af2" font-size="12" font-weight="600" text-anchor="middle">Remote AZ / DC</text>
+  <rect x="800" y="230" width="150" height="70" rx="8" fill="#1a2332" stroke="#bf5af2" stroke-width="2.5" stroke-dasharray="7 4"/>
+  <text x="875" y="258" fill="#bf5af2" font-size="14" font-weight="700" text-anchor="middle">broker 4</text>
+  <text x="875" y="280" fill="#bf5af2" font-size="11" text-anchor="middle">OBSERVER</text>
+  <text x="875" y="330" fill="#bf5af2" font-size="10" text-anchor="middle">syncs all data</text>
+  <text x="875" y="346" fill="#bf5af2" font-size="10" text-anchor="middle">never in ISR · never elected</text>
+  <text x="875" y="362" fill="#8b95a7" font-size="10" text-anchor="middle">promote = edit observer.ids</text>
+
+  <!-- Data flows -->
+  <!-- producer -> leader -->
+  <line x1="500" y1="112" x2="200" y2="228" stroke="#2997ff" stroke-width="2" marker-end="url(#arrB)" opacity="0.7"/>
+  <circle r="4" fill="#2997ff"><animateMotion dur="1.4s" repeatCount="indefinite" path="M500,112 L210,225"/></circle>
+
+  <!-- leader -> follower2 (solid green, replication) -->
+  <line x1="235" y1="265" x2="318" y2="265" stroke="#30d158" stroke-width="2" marker-end="url(#arrG)"/>
+  <circle r="4" fill="#30d158"><animateMotion dur="1.2s" repeatCount="indefinite" path="M235,265 L316,265"/></circle>
+
+  <!-- leader -> follower3 -->
+  <path d="M235,285 Q390,310 543,285" fill="none" stroke="#30d158" stroke-width="2" marker-end="url(#arrG)"/>
+  <circle r="4" fill="#30d158"><animateMotion dur="1.5s" repeatCount="indefinite" path="M235,285 Q390,310 543,285"/></circle>
+
+  <!-- leader -> observer (dashed purple) -->
+  <path d="M235,295 Q500,400 798,290" fill="none" stroke="#bf5af2" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrP)"/>
+  <circle r="4" fill="#bf5af2"><animateMotion dur="1.9s" repeatCount="indefinite" path="M235,295 Q500,400 798,290"/></circle>
+
+  <!-- HW annotation -->
+  <rect x="60" y="450" width="520" height="44" rx="8" fill="#0f1622" stroke="#30d158" stroke-width="1.5"/>
+  <text x="80" y="470" fill="#30d158" font-size="12" font-weight="600">HW = min(LEO of ISR members) — observer excluded structurally</text>
+  <text x="80" y="486" fill="#8b95a7" font-size="11">acks=all latency stays at ISR pace: measured 2.04–2.35 ms with observer in the slowest location</text>
+
+  <!-- Failure behavior legend -->
+  <rect x="600" y="450" width="380" height="90" rx="8" fill="#0f1622" stroke="#3a4556" stroke-width="1"/>
+  <text x="620" y="470" fill="#fff" font-size="12" font-weight="700">Failure behavior (minISR=2)</text>
+  <text x="620" y="490" fill="#30d158" font-size="11">Lose 1 AZ → ISR 3→2 ≥ minISR → writes continue, NO promotion</text>
+  <text x="620" y="508" fill="#ff9900" font-size="11">Lose 2 AZs → ISR 1 &lt; minISR → fail-stop → promote observer (~9 s)</text>
+  <text x="620" y="526" fill="#bf5af2" font-size="11">Observer down → zero impact on writes (it was never in the quorum)</text>
+
+  <!-- Legend -->
+  <g font-size="10" fill="#8b95a7">
+    <rect x="60" y="510" width="14" height="10" fill="none" stroke="#ff9900" stroke-width="2"/><text x="80" y="519">leader</text>
+    <rect x="135" y="510" width="14" height="10" fill="none" stroke="#30d158" stroke-width="2"/><text x="155" y="519">ISR follower</text>
+    <rect x="235" y="510" width="14" height="10" fill="none" stroke="#bf5af2" stroke-width="2" stroke-dasharray="4 3"/><text x="255" y="519">observer</text>
+    <line x1="330" y1="515" x2="360" y2="515" stroke="#30d158" stroke-width="2"/><text x="368" y="519">sync (counted for acks)</text>
+    <line x1="500" y1="515" x2="530" y2="515" stroke="#bf5af2" stroke-width="2" stroke-dasharray="5 3"/><text x="538" y="519">sync (not counted)</text>
+  </g>
 </svg>

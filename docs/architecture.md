@@ -4,6 +4,21 @@
   <img src="diagrams/architecture.svg" alt="Global architecture — 3 AZs, leader + ISR follower + observer; HW advances on ISR replicas only" width="100%">
 </p>
 
+## Topology guide
+
+The observer mechanism is topology-independent — the same patch, file, and runbooks apply whether you run 2, 3, or more ISR members. What changes is **when fail-stop happens and when you promote**. Pick deliberately:
+
+| | Minimum verified (POC) | **Production recommended** | Multi-observer |
+|---|---|---|---|
+| **Replica layout** | RF3 = 2 ISR (fast AZ pair) + 1 observer (third AZ) | RF4 = 3 ISR (one per AZ: broker 1 leader @ AZ-a, broker 2 @ AZ-b, broker 3 @ AZ-c) + 1 observer (broker 4, remote AZ/DC) | RF5+ = 3 ISR (one per AZ) + 2+ observers (remote AZ/DC/region) |
+| **`min.insync.replicas`** | 2 | 2 | 2 |
+| **Lose 1 AZ** | ISR 2→1 < minISR → **fail-stop**; promote the observer to resume writes | ISR 3→2 ≥ minISR → **writes continue, no promotion needed** | Same as production: writes continue |
+| **Lose 2 AZs** | (already fail-stopped at 1) | ISR 3→1 < minISR → **fail-stop**; promote the observer to resume writes | Fail-stop; promote the **least-lagged** observer (operator picks — promotion is explicit, never automatic) |
+| **Best for** | POC / cost-minimal stretch clusters; every single-AZ loss is an operator event | Production: single-AZ loss is a non-event; the observer is reserved for true disasters | Multi-site DR: independent recovery points, choose the freshest at promotion time |
+| **Verification status** | Fully verified end-to-end: [Scenario A runbook](runbooks/scenario-a-az-loss.md), [Scenario B runbook](runbooks/scenario-b-total-loss.md), [lifecycle evidence](../evidence/observer_v3_lifecycle_evidence.md), topic `sm` in the [S1–S8 matrix](../evidence/scenario_matrix_evidence.md) | Fully verified: topic `smx` (`--replica-assignment 3:1:2:4`, 4 brokers + 3 controllers) in the [S1–S8 matrix](../evidence/scenario_matrix_evidence.md) — S1 shows writes continue through a single ISR loss | Mechanism verified (the file takes multiple ids, [FAQ](faq.md)); the specific ≥2-observer layout has not been exercised on real machines |
+
+Measured numbers are topology-independent (they gate on the 5 s file cache + native ISR flows, not on replica count): promotion 4–10 s, demotion 9–12 s, auto-promoter end-to-end ≤14 s, observer-in-slowest-AZ `acks=all` latency 2.04–2.35 ms.
+
 ## The bookkeeping-team analogy
 
 Think of a Kafka partition as a bookkeeping team:

@@ -1,5 +1,7 @@
 # Runbook — Scenario A: one primary AZ is lost
 
+> **Which topology triggers this runbook?** The fail-stop scenario described here fires when **ISR drops below `min.insync.replicas`**. On the **minimum RF3 topology** (2 ISR + 1 observer, minISR=2 — the layout used in the walkthrough below) that happens when **1 AZ is lost**. On the **production-recommended RF4 topology** (3 ISR across 3 AZs + 1 observer, minISR=2) a single-AZ loss leaves ISR at 2 ≥ minISR and **writes continue with no promotion**; this runbook's fail-stop condition corresponds to **losing 2 AZs**. The recovery steps are identical either way — only the trigger differs. See the [topology guide](../architecture.md#topology-guide).
+
 <p align="center">
   <img src="../diagrams/failure-scenario-a.svg" alt="Scenario A animation — steady state, AZ loss and fail-stop, observer promotion, writes resume with RPO 0" width="100%">
 </p>

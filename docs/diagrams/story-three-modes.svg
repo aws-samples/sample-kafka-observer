@@ -6,7 +6,7 @@
 
   <!-- shared fault marker: all three columns start with the same failure at t=1s -->
   <g font-size="13" font-weight="700" text-anchor="middle">
-    <text x="500" y="66" fill="#ff453a" opacity="0">⚡ same fault in all three columns: follower dies, ISR &lt; minISR, writes fail-stop
+    <text x="500" y="66" fill="#ff453a" opacity="0">⚡ same fault in all three columns: ISR &lt; minISR → writes fail-stop (RF4: 2 AZs lost · RF3 minimum: 1 AZ lost)
       <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.067;0.93;1" dur="15s" repeatCount="indefinite"/></text>
   </g>
 
@@ -24,13 +24,13 @@
 
   <!-- ===== shared fault icon per column (flash at ~1s) ===== -->
   <g font-size="22" text-anchor="middle">
-    <text x="182" y="172" fill="#ff453a" opacity="0">✗ follower down
+    <text x="182" y="172" fill="#ff453a" opacity="0">✗ ISR &lt; minISR
       <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.067;0.93;1" dur="15s" repeatCount="indefinite"/>
       <animate attributeName="font-size" values="22;26;22" keyTimes="0;0.067;0.13" dur="15s" repeatCount="indefinite"/></text>
-    <text x="499" y="172" fill="#ff453a" opacity="0">✗ follower down
+    <text x="499" y="172" fill="#ff453a" opacity="0">✗ ISR &lt; minISR
       <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.067;0.93;1" dur="15s" repeatCount="indefinite"/>
       <animate attributeName="font-size" values="22;26;22" keyTimes="0;0.067;0.13" dur="15s" repeatCount="indefinite"/></text>
-    <text x="816" y="172" fill="#ff453a" opacity="0">✗ follower down
+    <text x="816" y="172" fill="#ff453a" opacity="0">✗ ISR &lt; minISR
       <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.067;0.93;1" dur="15s" repeatCount="indefinite"/>
       <animate attributeName="font-size" values="22;26;22" keyTimes="0;0.067;0.13" dur="15s" repeatCount="indefinite"/></text>
   </g>

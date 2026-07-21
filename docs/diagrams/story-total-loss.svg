@@ -1,19 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
-  <!-- Story animation: Scenario B (all primaries lost), 18 s loop, 5 phases
-       Phase boundaries (fraction of 18 s): 0 / 0.14 / 0.42 / 0.58 / 0.80 / 1 -->
+  <!-- Story animation: Scenario B (total primary loss) on the PRODUCTION topology
+       RF4 = 3 ISR members (brokers 1-3, one per AZ) + 1 observer (broker 4, remote AZ/DC)
+       18 s loop, 5 phases. Phase boundaries (fraction of 18 s): 0 / 0.14 / 0.42 / 0.58 / 0.80 / 1 -->
   <rect x="0" y="0" width="1000" height="620" rx="12" fill="#1a2332"/>
   <text x="30" y="34" fill="#e6edf3" font-size="19" font-weight="700">Story · Total primary loss — the observer never takes over on its own, but CAN lead when told to</text>
-  <text x="970" y="34" fill="#9fb0c3" font-size="12" text-anchor="end">18 s loop · real-machine test (Tokyo)</text>
+  <text x="970" y="34" fill="#9fb0c3" font-size="12" text-anchor="end">18 s loop · RF4 production topology · real-machine numbers (Tokyo)</text>
 
   <!-- ===== Phase banners ===== -->
   <g font-size="21" font-weight="800" text-anchor="middle">
-    <text x="500" y="80" fill="#9fb0c3" opacity="0">STEP 0 · Steady state — leader + follower in ISR, observer byte-identical
+    <text x="500" y="80" fill="#9fb0c3" opacity="0">STEP 0 · Steady state — 3 ISR members across 3 AZs, observer byte-identical in a remote AZ
       <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.02;0.12;0.14;1" dur="18s" repeatCount="indefinite"/></text>
-    <text x="500" y="80" fill="#ff453a" opacity="0">STEP 1 · Both primaries die at once — the entire ISR is gone
+    <text x="500" y="80" fill="#ff453a" opacity="0">STEP 1 · All three ISR members die — the entire ISR is gone
       <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.14;0.16;0.40;0.42;1" dur="18s" repeatCount="indefinite"/></text>
     <text x="500" y="80" fill="#d29922" opacity="0">STEP 2 · Operator decides — pre-check the log, then promote the observer
       <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.42;0.44;0.56;0.58;1" dur="18s" repeatCount="indefinite"/></text>
-    <text x="500" y="80" fill="#ff9900" opacity="0">STEP 3 · Promoted observer elected LEADER — 9.4 s from file edit
+    <text x="500" y="80" fill="#ff9900" opacity="0">STEP 3 · Promoted observer elected LEADER — ~9.4 s from file edit
       <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.58;0.60;0.78;0.80;1" dur="18s" repeatCount="indefinite"/></text>
     <text x="500" y="80" fill="#30d158" opacity="0">STEP 4 · Verified with real writes — produced and consumed back
       <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.80;0.82;0.99;1" dur="18s" repeatCount="indefinite"/></text>
@@ -21,94 +22,115 @@
 
   <!-- ===== Producer ===== -->
   <g>
-    <rect x="30" y="170" width="145" height="95" rx="10" fill="#223044" stroke="#4dabf7" stroke-width="2"/>
-    <text x="102" y="203" fill="#e6edf3" font-size="14" font-weight="700" text-anchor="middle">producer</text>
-    <text x="102" y="224" fill="#9fb0c3" font-size="11" text-anchor="middle">acks=all</text>
+    <rect x="22" y="170" width="112" height="95" rx="10" fill="#223044" stroke="#4dabf7" stroke-width="2"/>
+    <text x="78" y="203" fill="#e6edf3" font-size="14" font-weight="700" text-anchor="middle">producer</text>
+    <text x="78" y="224" fill="#9fb0c3" font-size="11" text-anchor="middle">acks=all</text>
   </g>
   <!-- producer failure label while leaderless -->
   <g opacity="0">
     <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.14;0.16;0.62;0.64;1" dur="18s" repeatCount="indefinite"/>
-    <rect x="18" y="280" width="170" height="26" rx="6" fill="#2b1518" stroke="#ff453a" stroke-width="1.5"/>
-    <text x="102" y="298" fill="#ff453a" font-size="12" font-weight="700" text-anchor="middle">✗ all writes fail (50/50)</text>
+    <rect x="10" y="280" width="150" height="26" rx="6" fill="#2b1518" stroke="#ff453a" stroke-width="1.5"/>
+    <text x="85" y="298" fill="#ff453a" font-size="12" font-weight="700" text-anchor="middle">✗ all writes fail</text>
   </g>
 
-  <!-- ===== broker 2: LEADER (dies in STEP 1) ===== -->
+  <!-- ===== broker 1: LEADER @ AZ-a (dies in STEP 1) ===== -->
   <g>
     <animate attributeName="opacity" values="1;1;0.15;0.15" keyTimes="0;0.14;0.16;1" dur="18s" repeatCount="indefinite"/>
-    <rect x="255" y="150" width="165" height="115" rx="10" fill="#223044" stroke="#ff9900" stroke-width="3"/>
-    <text x="337" y="183" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 2</text>
-    <text x="337" y="205" fill="#ff9900" font-size="13" font-weight="700" text-anchor="middle">LEADER</text>
-    <text x="337" y="229" fill="#30d158" font-size="11" font-weight="700" text-anchor="middle">in ISR</text>
+    <rect x="160" y="150" width="160" height="115" rx="10" fill="#223044" stroke="#ff9900" stroke-width="3"/>
+    <text x="240" y="181" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 1</text>
+    <text x="240" y="203" fill="#ff9900" font-size="13" font-weight="700" text-anchor="middle">LEADER</text>
+    <text x="240" y="226" fill="#30d158" font-size="11" font-weight="700" text-anchor="middle">in ISR</text>
+    <text x="240" y="247" fill="#9fb0c3" font-size="10.5" text-anchor="middle">AZ-a</text>
   </g>
   <g opacity="0">
     <animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.14;0.16;1" dur="18s" repeatCount="indefinite"/>
-    <rect x="255" y="150" width="165" height="115" rx="10" fill="#2b1518" stroke="#ff453a" stroke-width="2" stroke-dasharray="7 5"/>
-    <text x="337" y="191" fill="#ff453a" font-size="16" font-weight="800" text-anchor="middle">✗ broker 2</text>
-    <text x="337" y="215" fill="#ff453a" font-size="12" font-weight="700" text-anchor="middle">kill -9</text>
-    <text x="337" y="239" fill="#9fb0c3" font-size="10.5" text-anchor="middle">was leader</text>
+    <rect x="160" y="150" width="160" height="115" rx="10" fill="#2b1518" stroke="#ff453a" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="240" y="189" fill="#ff453a" font-size="16" font-weight="800" text-anchor="middle">✗ broker 1</text>
+    <text x="240" y="213" fill="#ff453a" font-size="12" font-weight="700" text-anchor="middle">kill -9</text>
+    <text x="240" y="237" fill="#9fb0c3" font-size="10.5" text-anchor="middle">was leader · AZ-a</text>
   </g>
 
-  <!-- ===== broker 1: follower (dies in STEP 1) ===== -->
+  <!-- ===== broker 2: follower @ AZ-b (dies in STEP 1) ===== -->
   <g>
     <animate attributeName="opacity" values="1;1;0.15;0.15" keyTimes="0;0.14;0.16;1" dur="18s" repeatCount="indefinite"/>
-    <rect x="470" y="150" width="165" height="115" rx="10" fill="#223044" stroke="#30d158" stroke-width="2"/>
-    <text x="552" y="183" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 1</text>
-    <text x="552" y="205" fill="#30d158" font-size="13" font-weight="700" text-anchor="middle">follower · in ISR</text>
+    <rect x="350" y="150" width="160" height="115" rx="10" fill="#223044" stroke="#30d158" stroke-width="2"/>
+    <text x="430" y="181" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 2</text>
+    <text x="430" y="203" fill="#30d158" font-size="13" font-weight="700" text-anchor="middle">follower · in ISR</text>
+    <text x="430" y="226" fill="#9fb0c3" font-size="10.5" text-anchor="middle">AZ-b</text>
   </g>
   <g opacity="0">
     <animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.14;0.16;1" dur="18s" repeatCount="indefinite"/>
-    <rect x="470" y="150" width="165" height="115" rx="10" fill="#2b1518" stroke="#ff453a" stroke-width="2" stroke-dasharray="7 5"/>
-    <text x="552" y="191" fill="#ff453a" font-size="16" font-weight="800" text-anchor="middle">✗ broker 1</text>
-    <text x="552" y="215" fill="#ff453a" font-size="12" font-weight="700" text-anchor="middle">kill -9</text>
-    <text x="552" y="239" fill="#9fb0c3" font-size="10.5" text-anchor="middle">was follower</text>
+    <rect x="350" y="150" width="160" height="115" rx="10" fill="#2b1518" stroke="#ff453a" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="430" y="189" fill="#ff453a" font-size="16" font-weight="800" text-anchor="middle">✗ broker 2</text>
+    <text x="430" y="213" fill="#ff453a" font-size="12" font-weight="700" text-anchor="middle">kill -9</text>
+    <text x="430" y="237" fill="#9fb0c3" font-size="10.5" text-anchor="middle">was follower · AZ-b</text>
   </g>
 
-  <!-- ===== broker 3: observer → promoted leader ===== -->
+  <!-- ===== broker 3: follower @ AZ-c (dies in STEP 1) ===== -->
+  <g>
+    <animate attributeName="opacity" values="1;1;0.15;0.15" keyTimes="0;0.14;0.16;1" dur="18s" repeatCount="indefinite"/>
+    <rect x="540" y="150" width="160" height="115" rx="10" fill="#223044" stroke="#30d158" stroke-width="2"/>
+    <text x="620" y="181" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 3</text>
+    <text x="620" y="203" fill="#30d158" font-size="13" font-weight="700" text-anchor="middle">follower · in ISR</text>
+    <text x="620" y="226" fill="#9fb0c3" font-size="10.5" text-anchor="middle">AZ-c</text>
+  </g>
+  <g opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.14;0.16;1" dur="18s" repeatCount="indefinite"/>
+    <rect x="540" y="150" width="160" height="115" rx="10" fill="#2b1518" stroke="#ff453a" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="620" y="189" fill="#ff453a" font-size="16" font-weight="800" text-anchor="middle">✗ broker 3</text>
+    <text x="620" y="213" fill="#ff453a" font-size="12" font-weight="700" text-anchor="middle">kill -9</text>
+    <text x="620" y="237" fill="#9fb0c3" font-size="10.5" text-anchor="middle">was follower · AZ-c</text>
+  </g>
+
+  <!-- ===== broker 4: observer → promoted leader ===== -->
   <!-- observer look (until STEP 3) -->
   <g>
     <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.58;0.62;1" dur="18s" repeatCount="indefinite"/>
-    <rect x="690" y="150" width="165" height="115" rx="10" fill="#241f33" stroke="#bf5af2" stroke-width="2" stroke-dasharray="7 5"/>
-    <text x="772" y="183" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 3</text>
-    <text x="772" y="205" fill="#bf5af2" font-size="13" font-weight="700" text-anchor="middle">OBSERVER</text>
-    <text x="772" y="229" fill="#9fb0c3" font-size="11" text-anchor="middle">alive · log byte-identical</text>
-    <text x="772" y="249" fill="#9fb0c3" font-size="10.5" text-anchor="middle">md5 = leader's md5 ✓</text>
+    <rect x="755" y="150" width="170" height="115" rx="10" fill="#241f33" stroke="#bf5af2" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="840" y="181" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 4</text>
+    <text x="840" y="203" fill="#bf5af2" font-size="13" font-weight="700" text-anchor="middle">OBSERVER</text>
+    <text x="840" y="226" fill="#9fb0c3" font-size="11" text-anchor="middle">remote AZ/DC · alive</text>
+    <text x="840" y="247" fill="#9fb0c3" font-size="10.5" text-anchor="middle">log byte-identical (md5 ✓)</text>
   </g>
   <!-- promoted leader look (STEP 3 onward): green ISR fill + orange leader border -->
   <g opacity="0">
     <animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.58;0.62;1" dur="18s" repeatCount="indefinite"/>
-    <rect x="690" y="150" width="165" height="115" rx="10" fill="#16281f" stroke="#ff9900" stroke-width="3.5"/>
-    <text x="772" y="183" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 3</text>
-    <text x="772" y="205" fill="#ff9900" font-size="13" font-weight="800" text-anchor="middle">LEADER</text>
-    <text x="772" y="229" fill="#30d158" font-size="11" font-weight="700" text-anchor="middle">promoted · Isr: 3</text>
-    <text x="772" y="249" fill="#9fb0c3" font-size="10.5" text-anchor="middle">elected via explicit unclean election</text>
+    <rect x="755" y="150" width="170" height="115" rx="10" fill="#16281f" stroke="#ff9900" stroke-width="3.5"/>
+    <text x="840" y="181" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">broker 4</text>
+    <text x="840" y="203" fill="#ff9900" font-size="13" font-weight="800" text-anchor="middle">LEADER</text>
+    <text x="840" y="226" fill="#30d158" font-size="11" font-weight="700" text-anchor="middle">promoted · Isr: 4</text>
+    <text x="840" y="247" fill="#9fb0c3" font-size="10.5" text-anchor="middle">elected via explicit unclean election</text>
   </g>
 
   <!-- ===== steady-state flows (STEP 0 only) ===== -->
   <g>
     <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.14;0.16;1" dur="18s" repeatCount="indefinite"/>
-    <line x1="175" y1="207" x2="255" y2="207" stroke="#3d4f66" stroke-width="1.5"/>
-    <circle r="4.5" fill="#4dabf7"><animateMotion path="M175,207 L255,207" dur="1.2s" repeatCount="indefinite"/></circle>
-    <line x1="420" y1="207" x2="470" y2="207" stroke="#3d4f66" stroke-width="1.5"/>
-    <circle r="4" fill="#30d158"><animateMotion path="M420,207 L470,207" dur="1.3s" repeatCount="indefinite"/></circle>
-    <path d="M635,207 L690,207" fill="none" stroke="#bf5af2" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.7"/>
-    <circle r="3.5" fill="#bf5af2"><animateMotion path="M635,207 L690,207" dur="1.6s" repeatCount="indefinite"/></circle>
+    <line x1="134" y1="207" x2="160" y2="207" stroke="#3d4f66" stroke-width="1.5"/>
+    <circle r="4.5" fill="#4dabf7"><animateMotion path="M134,207 L160,207" dur="0.9s" repeatCount="indefinite"/></circle>
+    <line x1="320" y1="200" x2="350" y2="200" stroke="#3d4f66" stroke-width="1.5"/>
+    <circle r="4" fill="#30d158"><animateMotion path="M320,200 L350,200" dur="1.3s" repeatCount="indefinite"/></circle>
+    <path d="M320,240 C 400,295 470,295 540,238" fill="none" stroke="#3d4f66" stroke-width="1.5"/>
+    <circle r="4" fill="#30d158"><animateMotion path="M320,240 C 400,295 470,295 540,238" dur="1.4s" repeatCount="indefinite"/></circle>
+    <path d="M320,258 C 520,335 650,325 755,250" fill="none" stroke="#bf5af2" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.7"/>
+    <circle r="3.5" fill="#bf5af2"><animateMotion path="M320,258 C 520,335 650,325 755,250" dur="1.8s" repeatCount="indefinite"/></circle>
   </g>
 
   <!-- ===== data flow to promoted leader (STEP 4) ===== -->
   <g opacity="0">
     <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.62;0.64;0.99;1" dur="18s" repeatCount="indefinite"/>
-    <path d="M175,240 C 380,320 560,300 690,238" fill="none" stroke="#4dabf7" stroke-width="1.5"/>
-    <circle r="4.5" fill="#4dabf7"><animateMotion path="M175,240 C 380,320 560,300 690,238" dur="1.6s" repeatCount="indefinite"/></circle>
-    <circle r="4.5" fill="#4dabf7"><animateMotion path="M175,240 C 380,320 560,300 690,238" dur="1.6s" begin="0.8s" repeatCount="indefinite"/></circle>
-    <text x="440" y="300" fill="#4dabf7" font-size="11.5" font-weight="700" text-anchor="middle">writes → new leader</text>
+    <path d="M134,240 C 380,320 600,300 755,238" fill="none" stroke="#4dabf7" stroke-width="1.5"/>
+    <circle r="4.5" fill="#4dabf7"><animateMotion path="M134,240 C 380,320 600,300 755,238" dur="1.6s" repeatCount="indefinite"/></circle>
+    <circle r="4.5" fill="#4dabf7"><animateMotion path="M134,240 C 380,320 600,300 755,238" dur="1.6s" begin="0.8s" repeatCount="indefinite"/></circle>
+    <text x="450" y="300" fill="#4dabf7" font-size="11.5" font-weight="700" text-anchor="middle">writes → new leader</text>
   </g>
 
   <!-- ===== STEP 1 centerpiece: Leader: none + refusal ===== -->
   <g opacity="0">
     <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.16;0.19;0.40;0.42;1" dur="18s" repeatCount="indefinite"/>
-    <text x="500" y="365" fill="#ff453a" font-size="38" font-weight="800" text-anchor="middle">Leader: none</text>
-    <text x="500" y="400" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">the un-promoted observer refuses to take over — even with unclean.leader.election.enable=true</text>
-    <text x="500" y="424" fill="#9fb0c3" font-size="12.5" text-anchor="middle">by design: a leader that can never re-enter ISR would deadlock the partition · fail-stop, no silent takeover, ever</text>
+    <text x="500" y="358" fill="#ff453a" font-size="38" font-weight="800" text-anchor="middle">Leader: none</text>
+    <text x="500" y="393" fill="#e6edf3" font-size="15" font-weight="700" text-anchor="middle">the un-promoted observer refuses to take over — even with unclean.leader.election.enable=true</text>
+    <text x="500" y="416" fill="#9fb0c3" font-size="12.5" text-anchor="middle">by design: a leader that can never re-enter ISR would deadlock the partition · fail-stop, no silent takeover, ever</text>
+    <text x="500" y="438" fill="#9fb0c3" font-size="11.5" text-anchor="middle">note: on RF4 with minISR=2, losing 2 of 3 AZs already fail-stops writes — total loss (all 3) is the extreme case shown here</text>
   </g>
 
   <!-- ===== STEP 2: operator terminal ===== -->
@@ -127,8 +149,8 @@
     <animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;0.58;0.60;0.78;0.80;1" dur="18s" repeatCount="indefinite"/>
     <rect x="235" y="330" width="530" height="76" rx="8" fill="#0d1420" stroke="#30d158" stroke-width="1.5"/>
     <text x="255" y="360" fill="#30d158" font-size="13" font-family="ui-monospace,Menlo,monospace">Successfully completed leader election (UNCLEAN) for partitions sm-0</text>
-    <text x="255" y="386" fill="#e6edf3" font-size="13" font-family="ui-monospace,Menlo,monospace">Topic: sm  Partition: 0  Leader: 3  Isr: 3   (9 353 ms after file edit)</text>
-    <text x="500" y="440" fill="#ff9900" font-size="15" font-weight="800" text-anchor="middle">⏱ 9.4 s file edit → serving leader · zero restarts · zero data movement</text>
+    <text x="255" y="386" fill="#e6edf3" font-size="13" font-family="ui-monospace,Menlo,monospace">Topic: sm  Partition: 0  Leader: 4  Isr: 4   (~9.4 s after file edit)</text>
+    <text x="500" y="440" fill="#ff9900" font-size="15" font-weight="800" text-anchor="middle">⏱ ~9.4 s file edit → serving leader · zero restarts · zero data movement</text>
   </g>
 
   <!-- ===== STEP 4 finale ===== -->
@@ -149,7 +171,7 @@
     <text x="156" y="532" text-anchor="middle">0 steady</text>
     <text x="324" y="532" text-anchor="middle">1 all ISR dead · Leader: none</text>
     <text x="500" y="532" text-anchor="middle">2 promote</text>
-    <text x="652" y="532" text-anchor="middle">3 elected · 9.4 s</text>
+    <text x="652" y="532" text-anchor="middle">3 elected · ~9.4 s</text>
     <text x="820" y="532" text-anchor="middle">4 real writes verified</text>
     <circle r="6" fill="#4dabf7">
       <animateMotion path="M100,510 L900,510" dur="18s" repeatCount="indefinite"/>
@@ -168,6 +190,6 @@
     <text x="405" y="587">dead</text>
     <circle cx="458" cy="583" r="4.5" fill="#4dabf7"/>
     <text x="468" y="587">writes</text>
-    <text x="900" y="587" text-anchor="end">evidence: runbooks/scenario-b-total-loss.md · scenario-playbook.md §S4</text>
+    <text x="900" y="587" text-anchor="end">timings measured on the minimum RF3 topology — semantics identical · evidence: runbooks/scenario-b-total-loss.md · scenario-playbook.md §S4</text>
   </g>
 </svg>

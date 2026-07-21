@@ -150,7 +150,7 @@ Same size, same md5, same last offset (3 099). No ISR action needed or possible.
 ## S4. Both primaries down → observer promotion
 
 <p align="center">
-  <img src="diagrams/story-total-loss.svg" alt="Looping story animation — both primaries killed, Leader: none because the un-promoted observer refuses to take over even unclean, operator promotes via file edit plus explicit unclean election, promoted observer elected leader in 9.4 seconds and verified with real writes" width="100%">
+  <img src="diagrams/story-total-loss.svg" alt="Looping story animation on the RF4 production topology — all three ISR members killed, Leader: none because the un-promoted observer refuses to take over even unclean, operator promotes via file edit plus explicit unclean election, promoted observer elected leader in about 9.4 seconds and verified with real writes" width="100%">
 </p>
 
 The full [runbook-B](runbooks/scenario-b-total-loss.md) disaster flow, with **both** minISR end-games exercised.

@@ -40,6 +40,14 @@ All diagrams are self-contained animated SVGs (SMIL). GitHub renders the animati
 
 **How to read it:** the reverse path — write the id back, the periodic `isr-expiration` task hits the `getOutOfSyncReplicas` hook, native ISR shrink pushes the broker out (measured ≤10–20 s). Replication continues; only electability is removed. Details: [architecture.md](architecture.md).
 
+### Latency panorama — five real-hardware points on one ruler
+
+<p align="center">
+  <img src="diagrams/perf-latency-panorama.svg" alt="Latency panorama — five measured p50 acks=all produce latencies on one linear ruler: cluster placement group 1.01 ms physical floor, same-AZ RF3 2.33 ms, observer 2.04-2.35 ms sitting on the baseline, 3-AZ RF3 2.38 ms, misplaced leader 5.42 ms" width="100%">
+</p>
+
+**How to read it:** five measured p50 produce latencies (acks=all, ap-northeast-1) on one linear ruler. The observer point (2.04–2.35 ms) sits **on** the ZK RF3 baseline (2.33 ms) — zero drag, because it is outside the acks critical path. The only real trap is a leader in the wrong AZ (5.42 ms — every message double-hops); fix with rack-aware leadership, not more replicas. Details: [architecture.md](architecture.md).
+
 ### Why exactly-once survives (vs MirrorMaker 2)
 
 <p align="center">
@@ -63,18 +71,18 @@ All diagrams are self-contained animated SVGs (SMIL). GitHub renders the animati
 ### Demotion — electable steps back to observer
 
 <p align="center">
-  <img src="diagrams/story-demotion.svg" alt="Animated demotion story — operator adds the id back to observer.ids, isr-expiration tick runs the getOutOfSyncReplicas hook, native ISR shrink pushes the broker out (~9-12 s measured), replication continues as an observer" width="100%">
+  <img src="diagrams/story-demotion.svg" alt="Animated demotion story on the RF4 production topology — operator adds broker 4 back to observer.ids, isr-expiration tick runs the getOutOfSyncReplicas hook, native ISR shrink pushes broker 4 out (~9-12 s measured), replication continues as an observer" width="100%">
 </p>
 
-**How to read it:** the mirror image of promotion — the ISR boundary contracts. Measured 9–12 s. Note the warning phase: if the broker is currently the **leader**, move leadership first (the native shrink never removes a leader). Details: [timing-and-automation.md](timing-and-automation.md).
+**How to read it:** the mirror image of promotion, on the RF4 production topology — broker 4 (remote AZ/DC) steps back from ISR member to observer and the ISR boundary contracts to {1, 2, 3}. Measured 9–12 s (KRaft); a pure metadata change — the dashed purple replication stream never stops. Note the warning phase: if broker 4 is currently the **leader**, move leadership first (the native shrink never removes a leader). Details: [timing-and-automation.md](timing-and-automation.md).
 
 ### Observer crash — the failure that does not matter
 
 <p align="center">
-  <img src="diagrams/story-observer-crash.svg" alt="Animated observer-crash story — observer dies, ISR/leader/writes/latency (2.0 ms) all unchanged, observer restarts and catches up on its own, log byte-identical after reconnect; zero impact on writes" width="100%">
+  <img src="diagrams/story-observer-crash.svg" alt="Animated observer-crash story on the RF4 production topology — observer broker 4 dies, ISR {1,2,3}/leader/writes/latency (2.0 ms) all unchanged, observer restarts and catches up on its own, log verified after reconnect; zero impact on writes" width="100%">
 </p>
 
-**How to read it:** the observer dies and the top row of indicators (ISR, leader, writes, latency) never changes — that is the whole point of sitting outside ISR. It restarts, catches up on its own, and the log is byte-identical after reconnect. Details: [timing-and-automation.md](timing-and-automation.md).
+**How to read it:** broker 4 (the remote observer) dies and the top row of indicators never changes — ISR stays {1, 2, 3}, the leader keeps acking, producer p50 holds at 2.0 ms. That is the whole point of sitting outside ISR. It restarts, catches up on its own, and the log is verified after reconnect (scenario S3). Details: [timing-and-automation.md](timing-and-automation.md).
 
 ---
 
@@ -88,13 +96,21 @@ All diagrams are self-contained animated SVGs (SMIL). GitHub renders the animati
 
 **How to read it:** the fail-stop is the feature — writes stop with `NOT_ENOUGH_REPLICAS` instead of silently losing data. One file edit later the observer is in ISR (~9 s) and writes resume with RPO = 0. When the AZ returns, the observer demotes back. Runbook: [runbooks/scenario-a-az-loss.md](runbooks/scenario-a-az-loss.md) · playbook: [scenario-playbook.md](scenario-playbook.md).
 
+### Scenario A — mechanism view (compact)
+
+<p align="center">
+  <img src="diagrams/failure-scenario-a.svg" alt="Scenario A compact animation — steady state Isr: 2,3, AZ loss and fail-stop, one file edit promotes the observer, ISR expands in ≤10 s, writes resume with RPO 0" width="100%">
+</p>
+
+**How to read it:** the compact 4-phase version of Scenario A used in the runbook — steady state → AZ down + fail-stop → one file edit → ISR recovery measured ≤10 s, RPO = 0. The full narrated version is `story-az-loss.svg` above. Runbook: [runbooks/scenario-a-az-loss.md](runbooks/scenario-a-az-loss.md).
+
 ### Scenario B — all primary replicas lost
 
 <p align="center">
-  <img src="diagrams/story-total-loss.svg" alt="Looping story animation — both primaries killed, Leader: none because the un-promoted observer refuses to take over even unclean, operator promotes via file edit plus explicit unclean election, promoted observer elected leader in 9.4 seconds and verified with real writes" width="100%">
+  <img src="diagrams/story-total-loss.svg" alt="Looping story animation on the RF4 production topology — all three ISR members killed, Leader: none because the un-promoted observer refuses to take over even unclean, operator promotes via file edit plus explicit unclean election, promoted observer elected leader in about 9.4 seconds and verified with real writes" width="100%">
 </p>
 
-**How to read it:** the key frame is `Leader: none` — the un-promoted observer refuses to take over **even with unclean election enabled**. Only an explicit promote + election makes it lead (9.4 s measured, verified with real writes). Safety by default, capability on demand. Runbook: [runbooks/scenario-b-total-loss.md](runbooks/scenario-b-total-loss.md).
+**How to read it:** all three ISR members die across three AZs and the key frame is `Leader: none` — the un-promoted observer (broker 4, remote AZ/DC, log byte-identical) refuses to take over **even with unclean election enabled**. Only an explicit promote (empty `observer.ids`) + explicit unclean election makes it lead (~9.4 s from file edit to serving leader, verified with real writes; the md5 pre-check proves zero lag, so unclean is safe here). Note the banner: on RF4 with minISR=2, losing 2 of 3 AZs already fail-stops writes — total loss of all 3 is the extreme case shown. Safety by default, capability on demand. Runbook: [runbooks/scenario-b-total-loss.md](runbooks/scenario-b-total-loss.md).
 
 ### observer.ids fail-safe — three injections, zero casualties
 
@@ -131,3 +147,15 @@ All diagrams are self-contained animated SVGs (SMIL). GitHub renders the animati
 </p>
 
 **How to read it:** in dry-run (`-n`) the daemon runs the full decision path on real faults but the arrow to the cluster is **blocked** — only the log line lands. A human reviews the trace ("would it have promoted at the right moment?"), flips one flag, and the identical detector gains real hands. This is week 1 of the recommended rollout SOP. Details: [auto-promotion.md](auto-promotion.md) · rollout timeline: [timing-and-automation.md](timing-and-automation.md).
+
+---
+
+## Evidence overview
+
+### Verification map — 9 evidence domains
+
+<p align="center">
+  <img src="diagrams/verification-map.svg" alt="Verification map — radial diagram with the observer at the center and nine evidence domains around it (lifecycle, EOS/CRC, transactions, MM2 control group, KRaft probe, multi-version, Kafka 4.x, ELR/KIP-966, 8 failure scenarios), all PASS on real machines" width="100%">
+</p>
+
+**How to read it:** the observer sits at the center; each radial spoke is one evidence report in [`evidence/`](../evidence/), and the flowing dots are that domain continuously exercising the observer's behavior. All 9 domains PASS on real Tokyo clusters — measured, not paper reasoning. Start here to find which raw report backs which claim.

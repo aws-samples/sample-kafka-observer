@@ -9,10 +9,70 @@ the current design. Nothing before v1.0 carries API-stability guarantees.
 
 ## [Unreleased]
 
-- v0.8 (outlook): topic-level observer config (`observer.replicas`) or
-  metadata-log-propagated marker as the file-distribution successor; upstream
-  KIP tracking (KIP-966 / KIP-929); long-running soak test of the
-  auto-promoter daemon mode (see ROADMAP.md)
+### Added
+
+- GitHub community-health files: `CODEOWNERS`, structured bug-report issue
+  template, pull-request template with a verification checklist.
+
+### Changed
+
+- README production-topology guidance clarified: the recommended production
+  layout is **RF4 = 3 ISR members across 3 AZs + 1 observer in a remote
+  AZ/DC** with `min.insync.replicas=2` — losing 1 AZ leaves ISR 3→2 ≥ minISR
+  so **writes continue without promoting the observer**; promotion is needed
+  only when 2+ AZs are lost (ISR 1 < minISR → fail-stop). This is the
+  topology the S1–S8 scenario matrix actually ran
+  (`--replica-assignment 3:1:2:4`, 4 brokers + 3 dedicated controllers).
+  The minimum verified topology (RF3 = 2 ISR + 1 observer) remains fully
+  tested and documented as a footnote.
+
+### Planned (v0.8 outlook)
+
+- Topic-level observer config (`observer.replicas`) or a
+  metadata-log-propagated marker as the file-distribution successor
+- Upstream KIP tracking (KIP-966 / KIP-929)
+- Long-running soak test of the auto-promoter daemon mode (see ROADMAP.md)
+
+## [0.7.1] - 2026-07-21
+
+Complete animated-SVG collection (17 diagrams, looping SMIL — GitHub renders
+them natively) plus the timing-and-automation analysis that answers the two
+most-asked questions: "what is the actual downtime?" and "is promotion
+automatic or manual?".
+
+### Added
+
+- **11 new animated SVGs** in `docs/diagrams/` (total now 17): lifecycle
+  stories (`story-promotion` — 4–10 s measured; `story-demotion` — 9–12 s
+  measured; `story-observer-crash` — zero write impact, acks=all latency
+  unchanged at ~2.0 ms), failure stories (`story-az-loss` — writes resume
+  ~9 s after the file edit, RPO = 0; `story-total-loss` — `Leader: none`
+  until explicit promote, then leader elected in 9.4 s;
+  `story-file-failsafe` — three injections against `observer.ids`, zero
+  broker casualties, controller fence self-heals in 5.8 s), automation
+  stories (`story-auto-promoter` — fault → detect → promote → writes
+  resumed ≤ 14 s total, demotes only what it promoted;
+  `story-three-modes` — Manual/Auto/Hybrid; `story-dryrun`), plus
+  `perf-latency-panorama` and `verification-map`.
+- **docs/visual-guide.md** — every diagram indexed in one place, each with a
+  "how to read it" explanation and a deep-dive link.
+- **docs/timing-and-automation.md** — failure-to-recovery summary table for
+  all 8 scenarios with measured times (S1 leader crash ~10.4 s automatic;
+  S2 follower crash: zero write interruption, rejoin 3.9 s; S4 dual-primary
+  loss: ~9 s from operator action; S4b with auto-promoter: ≤ 14 s total;
+  S5 lagging-observer catch-up 5.4 s for 30K records; S8 controller
+  failover 3.7 s), the key timing relationships
+  (`replica.lag.time.max.ms` / 5 s file cache / scan interval), and the
+  Manual vs Auto vs Hybrid operating-mode design.
+
+### Changed
+
+- `docs/scenario-playbook.md` and both runbooks now embed the story-level
+  animations next to the raw evidence they visualize.
+
+### Fixed
+
+- One stale measurement reference in `evidence/v07_operability_evidence.md`.
 
 ## [0.7.0] - 2026-07-20
 
@@ -29,23 +89,23 @@ ability to observe and to automate). Raw evidence in
 - **Canonical patch** `patches/kafka-3.7.1-kraft-v07/observer.patch` —
   combined ZK+KRaft patch (v0.6 hooks, 12 `OBSERVER PATCH` markers verified
   byte-identical) plus the v0.7 observability layer (6 files, +384/−8):
-  - **7 JMX gauges**, all reusing native `KafkaMetricsGroup` registration
-    (lock-free reads of existing volatile state, no extra IO):
-    - `kafka.observer:type=ObserverMetrics,name=ObserverCount` — this node's
-      view of the observer set size (detects file drift across nodes;
-      lazily registered — absent on a broker leading no partitions)
-    - `kafka.server:type=ReplicaManager,name=ObserversInIsrCount` — steady
-      state 0; measured non-zero only in the demotion transition window
-      (~5 s at `replica.lag.time.max.ms=10s`) or on a real gate bypass /
-      file inconsistency. Recommended alert: `> 0` sustained beyond
-      2× `replica.lag.time.max.ms`
-    - `kafka.server:type=ReplicaManager,name=ObserverCaughtUpCount` /
-      `ObserverLagMessages` — observer catch-up status using the native
-      `isCaughtUp` function (same semantics as the ISR check)
-    - per-partition `kafka.cluster:type=Partition,name={ObserversInIsrCount,
-      ObserverCaughtUpCount,ObserverLagMessages},topic=…,partition=…` —
-      parity with the isObserver/isCaughtUp/lag fields of Confluent's
-      `kafka-replica-status.sh`
+  **7 JMX gauges**, all reusing native `KafkaMetricsGroup` registration
+  (lock-free reads of existing volatile state, no extra IO):
+  - `kafka.observer:type=ObserverMetrics,name=ObserverCount` — this node's
+    view of the observer set size (detects file drift across nodes;
+    lazily registered — absent on a broker leading no partitions)
+  - `kafka.server:type=ReplicaManager,name=ObserversInIsrCount` — steady
+    state 0; measured non-zero only in the demotion transition window
+    (~5 s at `replica.lag.time.max.ms=10s`) or on a real gate bypass /
+    file inconsistency. Recommended alert: `> 0` sustained beyond
+    2× `replica.lag.time.max.ms`
+  - `kafka.server:type=ReplicaManager,name=ObserverCaughtUpCount` /
+    `ObserverLagMessages` — observer catch-up status using the native
+    `isCaughtUp` function (same semantics as the ISR check)
+  - per-partition `kafka.cluster:type=Partition,name={ObserversInIsrCount,
+    ObserverCaughtUpCount,ObserverLagMessages},topic=…,partition=…` —
+    parity with the isObserver/isCaughtUp/lag fields of Confluent's
+    `kafka-replica-status.sh`
 - **Structured audit log** (WARN, default-visible): every observer-set change
   emits a broker/controller pair — `OBSERVER AUDIT (broker)` /
   `OBSERVER AUDIT (controller)` — with
@@ -56,16 +116,26 @@ ability to observe and to automate). Raw evidence in
   (`under-min-isr` policy, **default OFF** with an explicit `-e` interlock)
   + systemd unit template `deploy/observer-auto-promoter.service` (never
   auto-installed) + design/risk/SOP doc `docs/auto-promotion.md`.
-  Fault-injection verification on a live cluster: broker kill → `DETECT` →
-  automatic promotion (scan→PROMOTE-OK **12 s**; ISR restored to ≥ minISR,
-  zero restart, zero data movement) → broker recovery → double-confirmed
-  automatic demotion (scan→DEMOTE-OK **31 s**, incl. 5 s double-check;
-  ownership state file correctly cleared). Dry-run mode (`-n`) verified to
-  log full decisions while mutating nothing. Safety: caught-up gate,
-  anti-flap cooldown, max one action per scan, scoped ownership
-  (only auto-demotes brokers it promoted), audit-or-die.
+  Safety: caught-up gate, anti-flap cooldown, max one action per scan,
+  scoped ownership (only auto-demotes brokers it promoted), audit-or-die.
 - **docs/monitoring-alerting.md** updated from design names to the shipped,
   measured metric semantics and alert thresholds.
+
+### Verified (real cluster, JMX readings + fault injection)
+
+- All 7 gauges read via JmxTool on a live cluster; steady state with a
+  caught-up observer reads `ObserverCount=1 / ObserversInIsrCount=0 /
+  ObserverCaughtUpCount=1 / ObserverLagMessages=0`.
+- `ObserversInIsrCount` semantics confirmed in both directions: a promoted
+  (delisted) broker in ISR counts 0; the demotion window shows a ~5 s
+  `Value=1` transition (1 s sampling: `8×0 → 5×1 → 27×0`).
+- Broker kill → `DETECT` → automatic promotion: scan→PROMOTE-OK **12 s**;
+  ISR restored to ≥ minISR, zero restart, zero data movement.
+- Broker recovery → double-confirmed automatic demotion: scan→DEMOTE-OK
+  **31 s** (incl. 5 s double-check + preferred-election check); file
+  change → ISR shrink ≤ 9 s; ownership state file correctly cleared.
+- Dry-run mode (`-n`) logs the full decision path
+  (`DETECT` → `PROMOTE-DRYRUN … no action taken`) while mutating nothing.
 
 ### Known boundaries (measured, not hidden)
 
@@ -110,7 +180,7 @@ nodes). Raw evidence in `evidence/kafka40_port_evidence.md` and
 - **docs/multi-version.md**: Kafka 4.x differences section (hunk-by-hunk port
   analysis, ELR compatibility, version guidance).
 
-### Verified capabilities (v0.6.0, Kafka 4.0.0 real cluster)
+### Verified (Kafka 4.0.0 real cluster)
 
 - Initial-ISR filtering (controller log
   `Filtered observers [3] from initial ISR [1, 2, 3] -> [1, 2]`)
@@ -120,21 +190,18 @@ nodes). Raw evidence in `evidence/kafka40_port_evidence.md` and
 - Unclean election refusal: kill all ISR members → `Leader: none` (the
   surviving observer is never elected, even with
   `unclean.leader.election.enable=true`); recovery with zero data loss
-
-### ELR (KIP-966) compatibility — verified, no code needed
-
-- Observers structurally never enter ELR or LastKnownElr: the ELR candidate
-  set is `ELR ∪ ISR` and observers never enter the ISR. Verified on real
-  clusters on both 4.0.0 (ELR manually enabled via `kafka-features.sh
-  upgrade --feature eligible.leader.replicas.version=1`) and 4.1.0 (ELR
-  default-on for new clusters at 4.1-IV1). The planned
-  `maybePopulateTargetElr` hook from the v0.4 design is therefore
-  unnecessary — the patch touches no ELR code.
-- ELR is complementary: non-observer ISR members that crash enter ELR and
-  recover with a clean election (zero data loss), stacking with the
+- **ELR (KIP-966) compatibility — verified, no code needed**: observers
+  structurally never enter ELR or LastKnownElr (the ELR candidate set is
+  `ELR ∪ ISR` and observers never enter the ISR). Verified on real clusters
+  on both 4.0.0 (ELR manually enabled via `kafka-features.sh upgrade
+  --feature eligible.leader.replicas.version=1`) and 4.1.0 (ELR default-on
+  for new clusters at 4.1-IV1). The planned `maybePopulateTargetElr` hook
+  from the v0.4 design is therefore unnecessary — the patch touches no ELR
+  code. ELR is complementary: non-observer ISR members that crash enter ELR
+  and recover with a clean election (zero data loss), stacking with the
   observer's never-unclean-elected guarantee.
 
-### Fixed / clarified
+### Fixed
 
 - The suspected missing negation in
   `PartitionChangeBuilder.canElectLastKnownLeader` (recorded in v0.4 source
@@ -146,14 +213,70 @@ nodes). Raw evidence in `evidence/kafka40_port_evidence.md` and
 
 ## [0.5.0] - 2026-07-20
 
-KRaft mode support for Kafka 3.7.1 — combined ZK+KRaft canonical patch
-(`patches/kafka-3.7.1-kraft/observer.patch`): broker-side hooks unchanged,
-new controller-side support in the `metadata` module (`ObserverReplicas.java`
-+ 3 `ReplicationControlManager` hooks). Full 8-item capability matrix passed
-on real machines in both combined and controller-only topologies — see
-`evidence/kraft_controller_patch_evidence.md` and ROADMAP.md. CI matrix
-(3.6.2–3.9.1 ZK) with weekly version-drift sentinel; `tools/check-anchors.sh`
-offline anchor verification.
+KRaft mode support for Kafka 3.7.1 — combined ZK+KRaft canonical patch: the
+same jar set now carries full observer capability in both modes. Full 8-item
+capability matrix passed on real machines in both combined and
+controller-only topologies. Raw evidence in
+`evidence/kraft_controller_patch_evidence.md`.
+
+### Added
+
+- **Canonical patch** `patches/kafka-3.7.1-kraft/observer.patch` — combined
+  ZK+KRaft patch (5 files, +271/−6): broker-side hooks unchanged, new
+  controller-side support in the `metadata` module:
+  - `ObserverReplicas.java` (new, 157 lines) — pure-Java twin of
+    `ObserverIds.scala`: reads `observer.ids` (path overridable via
+    `KAFKA_OBSERVER_IDS_FILE`), 5 s time cache, env-var fallback, fail-safe
+    reads (keep last value + WARN, never throw)
+  - `ReplicationControlManager.buildPartitionRegistration` — initial-ISR
+    filtering (fail-open: if filtering empties the ISR, keep original + WARN)
+  - `ReplicationControlManager$LeaderAcceptor.test` — one gate covering all
+    **7 election entry points, including unclean election**
+  - `ReplicationControlManager.ineligibleReplicasForIsr` — AlterPartition
+    second line of defense (`IneligibleReplica(brokerId, "observer")`)
+- **CI matrix** (3.6.2 / 3.7.1 / 3.8.1 / 3.9.1 ZK) with a weekly
+  version-drift sentinel; `tools/check-anchors.sh` offline anchor
+  verification.
+- **Deployment requirement documented**: KRaft needs 3 patched jars
+  (`core` + `metadata` + `storage`), and controller nodes must also carry
+  the patched jars + `observer.ids` (verified: a controller-only process
+  filters the initial ISR).
+
+### Verified (8-item capability matrix, real machines, two independent runs)
+
+- Initial ISR excludes the observer at topic creation — even when the
+  assignment lists it first (`Replicas: 3,1,2` → `Isr: 1,2`); controller
+  log `Filtered observers [3] from initial ISR [1, 2, 3] -> [1, 2]`
+- Full sync: 5000 records, observer LEO = 5000, all three data dirs
+  byte-identical (~21 MB per partition)
+- Never enters ISR: constant through active writes and a 12 s
+  (> `replica.lag.time.max.ms=10s`) wait
+- Promotion: clear the file → in ISR at **t+4 s** (all partitions, 5 s
+  cache + already-caught-up AlterPartition immediate admit)
+- Demotion (follower): write the id back → out of ISR at **t+9 s**
+- **Promoted observer serves as leader**: preferred election → `Leader: 3`,
+  200 writes ack'd through it, then survives killing a further non-observer
+  broker (`Leader: 3, Isr: 2,3`, writes continue)
+- **Kill all ISR members → un-promoted observer refuses leadership**:
+  `Leader: none` even with `unclean.leader.election.enable=true` and the
+  observer alive with complete data — the promote-then-lead path is what
+  disaster recovery relies on
+- Controller-only separation topology: observer filtering works when the
+  controller runs as a dedicated process (observer.ids on controller nodes
+  is a real requirement)
+- KRaft bonus: a running observer fetches **new** topics immediately
+  (partition dir appears at t+1 s) — the ZK-mode new-topic gap does not
+  exist in KRaft
+
+### Fixed / clarified
+
+- **KRaft behavioral difference discovered**: demoting a broker that is
+  currently **leader** never converges hot (KRaft ISR shrink is
+  leader-initiated and a leader never removes itself; observed stable for
+  85 s+; ZK mode has a controller-driven re-election path with no KRaft
+  equivalent). Correct SOP: write `observer.ids`, then rolling-restart that
+  broker → leadership moves immediately and it returns as a gated observer.
+  Follower demotion stays hot (~9 s), no restart.
 
 ## [0.3.0] - 2026-07-20
 
@@ -194,7 +317,7 @@ m7g.large). Raw evidence in `evidence/`.
   distribution artifact (no pre-built jars); redistributed binaries must be
   marked as modified and not labeled "Apache Kafka"
 
-### Verified capabilities (v0.3.0)
+### Verified (real EC2 clusters, 3 AZs)
 
 - Sync all data, never join ISR (`Isr: 2,3` while `Replicas: 2,3,1`)
 - Never drag the high-watermark (acks=all 2.04–2.35 ms with observer in the
@@ -217,8 +340,9 @@ m7g.large). Raw evidence in `evidence/`.
   (the native shrink path never removes the leader itself — a safety property,
   not a bug).
 
-[Unreleased]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.7.0...HEAD
-[0.7.0]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.3.0...v0.5.0
-[0.3.0]: https://github.com/aws-samples/sample-kafka-observer/releases/tag/v0.3.0
+[Unreleased]: https://github.com/neosun100/sample-kafka-observer/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/neosun100/sample-kafka-observer/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/neosun100/sample-kafka-observer/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/neosun100/sample-kafka-observer/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/neosun100/sample-kafka-observer/compare/v0.3.0...v0.5.0
+[0.3.0]: https://github.com/neosun100/sample-kafka-observer/releases/tag/v0.3.0

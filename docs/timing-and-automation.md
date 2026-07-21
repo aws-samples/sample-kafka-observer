@@ -11,12 +11,14 @@ Every number below was measured on real EC2 instances (Tokyo, Kafka 3.7.1/4.0, K
 | **S1 — leader broker crash** | Writes stop until new leader elected | Automatic (Kafka native ISR election) | **~10.4 s** (dominated by `replica.lag.time.max.ms`) | Zero loss: new leader was in ISR |
 | **S2 — ISR follower crash** | **None** (ISR shrinks but stays ≥ minISR) | Automatic (follower restarts, catches up, rejoins ISR) | Rejoin: **3.9 s** from restart | Zero loss |
 | **S3 — observer crash** | **None** (observer is not in ISR) | Automatic (observer restarts, catches up) | Catch-up: verifies byte-identical after reconnect | Zero loss, zero write impact |
-| **S4 — dual primary loss (fast-pair AZ gone)** | Writes stop immediately (ISR < minISR) | **Manual**: promote observer by editing `observer.ids` | Promotion **~4 s** + election **~5 s** = **~9 s** from operator action | Zero loss (observer was byte-identical) |
+| **S4 — all ISR members lost (ISR < minISR)**¹ | Writes stop immediately (ISR < minISR) | **Manual**: promote observer by editing `observer.ids` | Promotion **~4 s** + election **~5 s** = **~9 s** from operator action | Zero loss (observer was byte-identical) |
 | **S4b — same, with auto-promoter enabled** | Writes stop; auto-promoter detects in ≤ scan interval (10 s) + promotes | Automatic (daemon) | Detection **≤10 s** + promotion **~4 s** = **≤14 s** total | Zero loss |
 | **S5 — promote a lagging observer** | None (this is proactive promotion) | Operator promotes; observer must catch up before ISR admission | Catch-up: **5.4 s for 30K records** (15 MB); ISR admission only after LEO matches leader | HW does not regress; reads safe throughout |
 | **S6 — file inconsistency (partial update)** | None (controller rejects with `INELIGIBLE_REPLICA`) | Self-heal when files synchronized | **5.8 s** after alignment | Zero: fail-safe direction |
 | **S7 — observer.ids corrupted/unreadable** | None | Broker keeps last cached value + WARN log | Immediate (cache already in memory) | Zero: broker never crashes for config file |
 | **S8 — controller failover** | Writes pause briefly (~3.7 s for new controller election) | Automatic (Kafka native) | **3.7 s** | Zero: new controller correctly filters observer |
+
+¹ **Topology note (S4/S4b)**: the trigger is always "ISR < minISR", but which physical failure produces it depends on the topology. On the **minimum RF3 layout** (2 ISR + 1 observer, minISR=2 — the `sm` topic used in this measurement) it takes **1 lost AZ** ("dual primary loss" = the fast pair). On the **production-recommended RF4 layout** (3 ISR across 3 AZs + 1 observer, minISR=2 — the `smx` topic) a single-AZ loss leaves ISR ≥ minISR and **writes continue with no promotion**; S4 corresponds to **losing 2+ AZs**. Recovery mechanics and timings are identical. See the [topology guide](architecture.md#topology-guide).
 
 ### Key timing relationships
 
