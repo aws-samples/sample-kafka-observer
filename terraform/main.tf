@@ -195,6 +195,11 @@ resource "aws_instance" "broker" {
   vpc_security_group_ids      = [aws_security_group.cluster.id]
   associate_public_ip_address = true
 
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
+
   root_block_device {
     volume_type = "gp3"
     volume_size = var.root_volume_size_gb
@@ -222,6 +227,11 @@ resource "aws_instance" "loadgen" {
   subnet_id                   = local.subnet_ids[0]
   vpc_security_group_ids      = [aws_security_group.cluster.id]
   associate_public_ip_address = true
+
+  metadata_options {
+    http_tokens   = "required"
+    http_endpoint = "enabled"
+  }
 
   root_block_device {
     volume_type = "gp3"
