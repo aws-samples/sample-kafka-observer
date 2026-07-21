@@ -340,9 +340,9 @@ m7g.large). Raw evidence in `evidence/`.
   (the native shrink path never removes the leader itself — a safety property,
   not a bug).
 
-[Unreleased]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.7.1...HEAD
-[0.7.1]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.7.0...v0.7.1
-[0.7.0]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.6.0...v0.7.0
-[0.6.0]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.5.0...v0.6.0
-[0.5.0]: https://github.com/aws-samples/sample-kafka-observer/compare/v0.3.0...v0.5.0
-[0.3.0]: https://github.com/aws-samples/sample-kafka-observer/releases/tag/v0.3.0
+[Unreleased]: https://github.com/neosun100/sample-kafka-observer/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/neosun100/sample-kafka-observer/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/neosun100/sample-kafka-observer/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/neosun100/sample-kafka-observer/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/neosun100/sample-kafka-observer/compare/v0.3.0...v0.5.0
+[0.3.0]: https://github.com/neosun100/sample-kafka-observer/releases/tag/v0.3.0
