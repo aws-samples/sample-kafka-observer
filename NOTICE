@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 sample-kafka-observer
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
@@ -11,3 +12,6 @@ they must be clearly marked as modified per the Apache License 2.0.
 
 The patch files in patches/ contain code fragments derived from
 Apache Kafka source code, licensed under the Apache License 2.0.
+=======
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+>>>>>>> awssamples/main
