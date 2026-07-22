@@ -57,7 +57,7 @@ jobs:
 
       - name: Set up Terraform
         if: steps.tf.outputs.present == 'true'
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
 
       - name: terraform fmt -check -recursive
         if: steps.tf.outputs.present == 'true'
