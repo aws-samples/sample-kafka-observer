@@ -1,0 +1,115 @@
+########################################################
+# Observer patch 真机验证 — Kafka 4.1.2 (KRaft 模式)
+# host: builder.internal  arch: aarch64  jdk: openjdk version "17.0.19" 2026-04-21 LTS
+# started: 2026-07-22T20:54:23Z
+# core jar md5: 68d82151d9d4eb5a4b351036aabb6af7  metadata jar: kafka-metadata-4.1.2.jar
+# ObserverIds in core: 2  ObserverReplicas in metadata: 1
+########################################################
+cluster.id=UA4WYYAlR0aS2uJLuH1hNg
+
+=== 生成配置 + format storage ===
+=== 启动 controller quorum(101/102/103) ===
+=== 启动 4 brokers(observer=3) ===
+
+=== 建 topic smx: replica-assignment 3:1:2:4, minISR=2 ===
+DEPRECATED: A Log4j 1.x configuration file has been detected, which is no longer recommended.
+To use a Log4j 2.x configuration, please see https://logging.apache.org/log4j/2.x/migrate-from-log4j1.html#Log4j2ConfigurationFormat for details about Log4j configuration file migration.
+You can also use the $KAFKA_HOME/config/tools-log4j2.yaml file as a starting point. Make sure to remove the Log4j 1.x configuration after completing the migration.
+Created topic smx.
+初始: 	Topic: smx	Partition: 0	Leader: 1	Replicas: 3,1,2,4	Isr: 1,2,4	Elr: 	LastKnownElr: 
+  → Leader=1 ISR=1,2,4 (期望不含 observer 3)
+
+===== S1: leader 崩溃 — 20:55:12Z =====
+leader=1 ISR=1,2,4
+baseline: 500 records sent, 495.0 records/sec (0.09 MB/sec), 109.81 ms avg latency, 540.00 ms max latency, 51 ms 50th, 249 ms 95th, 250 ms 99th, 540 ms 99.9th.
+新 leader=2 用时 9297ms (observer 3 不当选) ISR=2,4
+降级写入: 300 records sent, 489.4 records/sec (0.09 MB/sec), 39.73 ms avg latency, 555.00 ms max latency, 40 ms 50th, 44 ms 95th, 44 ms 99th, 555 ms 99.9th.
+重启后 ISR=2,4,1
+===== S1 done =====
+
+===== S2: follower 崩溃 — 20:55:45Z =====
+leader=2 杀 follower=1
+shrink 后 ISR=2,4 leader=2
+写入: 300 records sent, 491.0 records/sec (0.09 MB/sec), 17.46 ms avg latency, 529.00 ms max latency, 16 ms 50th, 21 ms 95th, 21 ms 99th, 529 ms 99.9th.
+重启后 ISR=2,4,1
+===== S2 done =====
+
+===== S3: observer 崩溃 — 20:56:17Z =====
+pre ISR=2,4,1
+baseline latency: 1000 records sent, 497.8 records/sec (0.09 MB/sec), 8.52 ms avg latency, 318.00 ms max latency, 6 ms 50th, 22 ms 95th, 24 ms 99th, 318 ms 99.9th.
+observer 死后 ISR=2,4,1 (不变)
+写入零影响: 500 records sent, 495.5 records/sec (0.09 MB/sec), 44.10 ms avg latency, 411.00 ms max latency, 8 ms 50th, 113 ms 95th, 114 ms 99th, 411 ms 99.9th.
+追平后 leader(2) vs observer(3) 段 md5:
+03ee98f69aa98854621bccc85ae471a5  /home/ec2-user/work/obs-test-4.1.2-kraft/data-b2/smx-0/00000000000000000000.log
+03ee98f69aa98854621bccc85ae471a5  /home/ec2-user/work/obs-test-4.1.2-kraft/data-b3/smx-0/00000000000000000000.log
+===== S3 done =====
+
+===== S4: 全 primary 崩溃 → 晋升 — 20:56:53Z =====
+pre ISR=2,4,1
+晋升前字节一致:
+03ee98f69aa98854621bccc85ae471a5  /home/ec2-user/work/obs-test-4.1.2-kraft/data-b2/smx-0/00000000000000000000.log
+03ee98f69aa98854621bccc85ae471a5  /home/ec2-user/work/obs-test-4.1.2-kraft/data-b3/smx-0/00000000000000000000.log
+全 primary 死后 Leader= ISR=
+写入应失败: (write failed)
+--- PROMOTE: 所有 broker+controller 的 observer.ids 删 3 --- 20:57:40.514Z
+DEPRECATED: A Log4j 1.x configuration file has been detected, which is no longer recommended.
+To use a Log4j 2.x configuration, please see https://logging.apache.org/log4j/2.x/migrate-from-log4j1.html#Log4j2ConfigurationFormat for details about Log4j configuration file migration.
+You can also use the $KAFKA_HOME/config/tools-log4j2.yaml file as a starting point. Make sure to remove the Log4j 1.x configuration after completing the migration.
+Successfully completed leader election (UNCLEAN) for partitions smx-0
+晋升后 Leader=3 ISR=3 用时 10550ms
+从 observer 读回:
+DEPRECATED: A Log4j 1.x configuration file has been detected, which is no longer recommended.
+To use a Log4j 2.x configuration, please see https://logging.apache.org/log4j/2.x/migrate-from-log4j1.html#Log4j2ConfigurationFormat for details about Log4j configuration file migration.
+You can also use the $KAFKA_HOME/config/tools-log4j2.yaml file as a starting point. Make sure to remove the Log4j 1.x configuration after completing the migration.
+YQHHNEBSEPDNSEIFGAMSUJXKOLTXSPLGHDIOYZJFNIDSPWHZMKVJAXDBZFCOXYKYRJOGYKDESSJMOIIOWVKYUAVWJLXSEPPFEILVBASHCGRHSYGIFSYLVGRXCDVABWWTRQZTMMPBAXGHEPHTASSORYKGVPFGQYJKINSZUJLXQUUDVALUSBFRSXNQHSDFDBAKQZZNTYXF
+HYGDPYGNRETYAXIXXYQKMKURDSJYIZNEDAHVIVHCJAPGOBQLHUZTKIWTVFEHVYPNGHIDSERMARFXCPYFEPQMFDOTDPWNKMYRMFIABIQAWWOIFIAKNYFEPTPMIXPQAXFEIKUFFXIDHILBPCBTHWDRMALHFNDCRHAYVLLMRCKJIPNPKGWCIWQCHNHSFSCTYSAKSLVZCCAI
+EQPLJXYUOEAXPRAZJTORBMPXEHFXWWDCLYKGOMSNWQRLKKSCQTGSULLGFKIMMDGUADVXGLMXQTUSLILYJYYSHHLJZDIESDPJXSCTADZFGIDJSDEKDOLVWIGOTDAWKWONSMYUFDTHZMNAUUYIBAGIWIITLRUSQIZZSLHSMEMKRBTTMXTZHVLSDRSAQTCJXGFHEOYOWYOA
+===== S4 done =====
+
+=== 恢复集群 ===
+恢复后 Leader= ISR=
+
+===== S5: 晋升滞后 observer — 20:58:53Z =====
+pre ISR=
+灌 30000: (write failed)
+observer 追平进 ISR 用时 3303ms ISR=3,2,1,4
+晋升后写入: 1000 records sent, 497.8 records/sec (0.09 MB/sec), 13.20 ms avg latency, 348.00 ms max latency, 7 ms 50th, 47 ms 95th, 49 ms 99th, 348 ms 99.9th.
+恢复后 Leader=1 ISR=2,1,4
+===== S5 done =====
+
+===== S6: observer.ids 不一致(broker删/controller留) — 21:00:25Z =====
+pre ISR=2,1,4
+INJECT: 只清 broker 的 observer.ids, controller 保留 3 → controller 应拒绝 AlterPartition
+不一致期间 ISR=2,1,4 (期望仍不含 3, controller 侧 fail-safe)
+controller 拒绝日志:
+  [2026-07-22 21:00:58,173] INFO [QuorumController id=101] Rejecting AlterPartition request from node 1 for smx-0 because it specified ineligible replicas [3 (observer)] in the new ISR [BrokerState(brokerId=2, brokerEpoch=510), BrokerState(brokerId=1, brokerEpoch=511), BrokerState(brokerId=4, brokerEpoch=512), BrokerState(brokerId=3, brokerEpoch=992)]. (org.apache.kafka.controller.ReplicationControlManager)
+  [2026-07-22 21:00:58,173] INFO [QuorumController id=101] Rejecting AlterPartition request from node 1 for smx-0 because it specified ineligible replicas [3 (observer)] in the new ISR [BrokerState(brokerId=2, brokerEpoch=510), BrokerState(brokerId=1, brokerEpoch=511), BrokerState(brokerId=4, brokerEpoch=512), BrokerState(brokerId=3, brokerEpoch=992)]. (org.apache.kafka.controller.ReplicationControlManager)
+自愈后 ISR=2,1,4
+===== S6 done =====
+
+===== S7: observer.ids 损坏/权限/删除 — 21:01:07Z =====
+pre ISR=2,1,4
+7a: chmod 000 leader(1) 文件
+权限拒绝后 ISR=2,1,4 (不变)
+  [2026-07-22 21:01:23,131] WARN Failed to read observer ids from /home/ec2-user/work/obs-test-4.1.2-kraft/obs-b1.ids, keeping last value Set(3) (kafka.observer.ObserverIds$)
+写入: 100 records sent, 217.4 records/sec (0.04 MB/sec), 147.12 ms avg latency, 448.00 ms max latency, 144 ms 50th, 146 ms 95th, 448 ms 99th, 448 ms 99.9th.
+7b: 写垃圾
+垃圾后 ISR=2,1,4 (3 仍解析出)
+7c: 删文件
+删除后 ISR=2,1,4
+恢复后 ISR=2,1,4
+===== S7 done =====
+
+===== S8: controller failover(KRaft quorum) — 21:01:54Z =====
+pre ISR=2,1,4
+INJECT: kill controller 101(quorum 成员)
+controller 挂后 ISR=2,1,4 (剩余 quorum 102/103 接管, 仍排除 observer)
+failover 后写入: 200 records sent, 487.8 records/sec (0.09 MB/sec), 16.28 ms avg latency, 311.00 ms max latency, 16 ms 50th, 21 ms 95th, 21 ms 99th, 311 ms 99.9th.
+恢复后 ISR=2,1,4
+===== S8 done =====
+
+=== 停止集群 — 21:02:21Z ===
+########################################################
+# Kafka 4.1.2 (KRaft) observer patch 场景验证结束
+# 完成: 2026-07-22T21:02:21Z
+########################################################

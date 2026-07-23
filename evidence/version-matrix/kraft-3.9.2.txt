@@ -1,0 +1,109 @@
+########################################################
+# Observer patch 真机验证 — Kafka 3.9.2 (KRaft 模式)
+# host: builder.internal  arch: aarch64  jdk: openjdk version "11.0.31" 2026-04-21 LTS
+# started: 2026-07-22T20:36:03Z
+# core jar md5: d294cdde7d7063207a491434d2e63fbd  metadata jar: kafka-metadata-3.9.2.jar
+# ObserverIds in core: 2  ObserverReplicas in metadata: 1
+########################################################
+cluster.id=bfC39MUYSlOlSMieYVLNjg
+
+=== 生成配置 + format storage ===
+=== 启动 controller quorum(101/102/103) ===
+=== 启动 4 brokers(observer=3) ===
+
+=== 建 topic smx: replica-assignment 3:1:2:4, minISR=2 ===
+Created topic smx.
+初始: 	Topic: smx	Partition: 0	Leader: 1	Replicas: 3,1,2,4	Isr: 1,2,4	Elr: 	LastKnownElr: 
+  → Leader=1 ISR=1,2,4 (期望不含 observer 3)
+
+===== S1: leader 崩溃 — 20:36:52Z =====
+leader=1 ISR=1,2,4
+baseline: 500 records sent, 489.715965 records/sec (0.09 MB/sec), 128.13 ms avg latency, 596.00 ms max latency, 110 ms 50th, 248 ms 95th, 250 ms 99th, 596 ms 99.9th.
+新 leader=2 用时 8819ms (observer 3 不当选) ISR=2,4
+降级写入: 300 records sent, 480.769231 records/sec (0.09 MB/sec), 47.76 ms avg latency, 594.00 ms max latency, 47 ms 50th, 49 ms 95th, 49 ms 99th, 594 ms 99.9th.
+重启后 ISR=2,4,1
+===== S1 done =====
+
+===== S2: follower 崩溃 — 20:37:24Z =====
+leader=2 杀 follower=1
+shrink 后 ISR=2,4 leader=2
+写入: 300 records sent, 488.599349 records/sec (0.09 MB/sec), 170.36 ms avg latency, 569.00 ms max latency, 215 ms 50th, 217 ms 95th, 218 ms 99th, 569 ms 99.9th.
+重启后 ISR=2,4,1
+===== S2 done =====
+
+===== S3: observer 崩溃 — 20:37:58Z =====
+pre ISR=2,4,1
+baseline latency: 1000 records sent, 498.007968 records/sec (0.09 MB/sec), 8.04 ms avg latency, 370.00 ms max latency, 4 ms 50th, 21 ms 95th, 23 ms 99th, 370 ms 99.9th.
+observer 死后 ISR=2,4,1 (不变)
+写入零影响: 500 records sent, 496.524330 records/sec (0.09 MB/sec), 49.69 ms avg latency, 465.00 ms max latency, 2 ms 50th, 118 ms 95th, 118 ms 99th, 465 ms 99.9th.
+追平后 leader(2) vs observer(3) 段 md5:
+0b5a1221a4e3d4f7b142b0bfcfd4674d  /home/ec2-user/work/obs-test-3.9.2-kraft/data-b2/smx-0/00000000000000000000.log
+0b5a1221a4e3d4f7b142b0bfcfd4674d  /home/ec2-user/work/obs-test-3.9.2-kraft/data-b3/smx-0/00000000000000000000.log
+===== S3 done =====
+
+===== S4: 全 primary 崩溃 → 晋升 — 20:38:32Z =====
+pre ISR=2,4,1
+晋升前字节一致:
+0b5a1221a4e3d4f7b142b0bfcfd4674d  /home/ec2-user/work/obs-test-3.9.2-kraft/data-b2/smx-0/00000000000000000000.log
+0b5a1221a4e3d4f7b142b0bfcfd4674d  /home/ec2-user/work/obs-test-3.9.2-kraft/data-b3/smx-0/00000000000000000000.log
+全 primary 死后 Leader= ISR=4
+写入应失败: (write failed)
+--- PROMOTE: 所有 broker+controller 的 observer.ids 删 3 --- 20:39:19.882Z
+Successfully completed leader election (UNCLEAN) for partitions smx-0
+晋升后 Leader=3 ISR=3 用时 10406ms
+从 observer 读回:
+YQHHNEBSEPDNSEIFGAMSUJXKOLTXSPLGHDIOYZJFNIDSPWHZMKVJAXDBZFCOXYKYRJOGYKDESSJMOIIOWVKYUAVWJLXSEPPFEILVBASHCGRHSYGIFSYLVGRXCDVABWWTRQZTMMPBAXGHEPHTASSORYKGVPFGQYJKINSZUJLXQUUDVALUSBFRSXNQHSDFDBAKQZZNTYXF
+HYGDPYGNRETYAXIXXYQKMKURDSJYIZNEDAHVIVHCJAPGOBQLHUZTKIWTVFEHVYPNGHIDSERMARFXCPYFEPQMFDOTDPWNKMYRMFIABIQAWWOIFIAKNYFEPTPMIXPQAXFEIKUFFXIDHILBPCBTHWDRMALHFNDCRHAYVLLMRCKJIPNPKGWCIWQCHNHSFSCTYSAKSLVZCCAI
+EQPLJXYUOEAXPRAZJTORBMPXEHFXWWDCLYKGOMSNWQRLKKSCQTGSULLGFKIMMDGUADVXGLMXQTUSLILYJYYSHHLJZDIESDPJXSCTADZFGIDJSDEKDOLVWIGOTDAWKWONSMYUFDTHZMNAUUYIBAGIWIITLRUSQIZZSLHSMEMKRBTTMXTZHVLSDRSAQTCJXGFHEOYOWYOA
+VCWFCIOKADNWMXSVJDQCJGDLAPZJYGERVUSGJKJNGDANRLCUXZEXNCPOYEKSTNILYJLHMOMJMAYAJLZZWIKTZUWSFLEWSLKDMKJFCKLHSNENGJTJCUJBYMAKFQLACJFDAHQJUOVIXSSSANPTDMINEPHFHDROYLWCTQDJUDUMKMRPKZIMZGPMMZHVIEDUHUDZSUZQAEUT
+KJHVHJUIMJVMUFRQKAVHWFUCETSPADNVNDAGADVDWEFEINWXNQDGSBRVFIWVFZFYUKJDKRZNCMFQTVIOQEYLLZFJXZJTVOWYVIIQOBXKZZRAVVFYDJSJXRKBSHEXWHBXGPXCYPBQMUQPCJEERMCHVYBADQCZUIWZAGXVHWJKTFOEUCDLLMLHVTUXRRCCTEOEVZRAACSR
+Processed a total of 5 messages
+===== S4 done =====
+
+=== 恢复集群 ===
+恢复后 Leader= ISR=3
+
+===== S5: 晋升滞后 observer — 20:41:44Z =====
+pre ISR=3
+灌 30000: (write failed)
+observer 追平进 ISR 用时 3192ms ISR=3
+晋升后写入: 1000 records sent, 498.007968 records/sec (0.09 MB/sec), 16.09 ms avg latency, 405.00 ms max latency, 6 ms 50th, 52 ms 95th, 55 ms 99th, 405 ms 99.9th.
+恢复后 Leader=1 ISR=2,1,4
+===== S5 done =====
+
+===== S6: observer.ids 不一致(broker删/controller留) — 20:43:15Z =====
+pre ISR=2,1,4
+INJECT: 只清 broker 的 observer.ids, controller 保留 3 → controller 应拒绝 AlterPartition
+不一致期间 ISR=2,1,4 (期望仍不含 3, controller 侧 fail-safe)
+controller 拒绝日志:
+  [2026-07-22 20:43:47,746] INFO [QuorumController id=101] Rejecting AlterPartition request from node 1 for smx-0 because it specified ineligible replicas [3 (observer)] in the new ISR [BrokerState(brokerId=2, brokerEpoch=509), BrokerState(brokerId=1, brokerEpoch=508), BrokerState(brokerId=4, brokerEpoch=507), BrokerState(brokerId=3, brokerEpoch=1079)]. (org.apache.kafka.controller.ReplicationControlManager)
+  [2026-07-22 20:43:47,746] INFO [QuorumController id=101] Rejecting AlterPartition request from node 1 for smx-0 because it specified ineligible replicas [3 (observer)] in the new ISR [BrokerState(brokerId=2, brokerEpoch=509), BrokerState(brokerId=1, brokerEpoch=508), BrokerState(brokerId=4, brokerEpoch=507), BrokerState(brokerId=3, brokerEpoch=1079)]. (org.apache.kafka.controller.ReplicationControlManager)
+自愈后 ISR=2,1,4
+===== S6 done =====
+
+===== S7: observer.ids 损坏/权限/删除 — 20:43:57Z =====
+pre ISR=2,1,4
+7a: chmod 000 leader(1) 文件
+权限拒绝后 ISR=2,1,4 (不变)
+  [2026-07-22 20:44:12,523] WARN Failed to read observer ids from /home/ec2-user/work/obs-test-3.9.2-kraft/obs-b1.ids, keeping last value Set(3) (kafka.observer.ObserverIds$)
+写入: 100 records sent, 164.744646 records/sec (0.03 MB/sec), 246.99 ms avg latency, 598.00 ms max latency, 243 ms 50th, 245 ms 95th, 598 ms 99th, 598 ms 99.9th.
+7b: 写垃圾
+垃圾后 ISR=2,1,4 (3 仍解析出)
+7c: 删文件
+删除后 ISR=2,1,4
+恢复后 ISR=2,1,4
+===== S7 done =====
+
+===== S8: controller failover(KRaft quorum) — 20:44:43Z =====
+pre ISR=2,1,4
+INJECT: kill controller 101(quorum 成员)
+controller 挂后 ISR=2,1,4 (剩余 quorum 102/103 接管, 仍排除 observer)
+failover 后写入: 200 records sent, 488.997555 records/sec (0.09 MB/sec), 19.21 ms avg latency, 373.00 ms max latency, 19 ms 50th, 21 ms 95th, 21 ms 99th, 373 ms 99.9th.
+恢复后 ISR=2,1,4
+===== S8 done =====
+
+=== 停止集群 — 20:45:10Z ===
+########################################################
+# Kafka 3.9.2 (KRaft) observer patch 场景验证结束
+# 完成: 2026-07-22T20:45:10Z
+########################################################

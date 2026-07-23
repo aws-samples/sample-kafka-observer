@@ -1,0 +1,143 @@
+########################################################
+# Observer patch 真机验证 — Kafka 3.4.1 (ZooKeeper 模式)
+# host: builder.internal  arch: aarch64  jdk: openjdk version "11.0.31" 2026-04-21 LTS
+# started: 2026-07-22T18:55:28Z
+# core jar: bedd38e80773ffb0d1d6bc47cb3b8ae0  observer class: 2
+########################################################
+
+=== 启动 ZooKeeper (port 32181) ===
+ZK: imok
+
+=== 启动 4 brokers (observer = broker 3, 每 broker 独立 observer.ids=3) ===
+等待 brokers 注册...
+在线 brokers: [1, 2, 3, 4]
+
+=== 建 topic smx: --replica-assignment 3:1:2:4, min.insync.replicas=2 ===
+Created topic smx.
+Topic: smx	TopicId: DfVf-kmERAi2qvPhmYIFhw	PartitionCount: 1	ReplicationFactor: 4	Configs: min.insync.replicas=2
+	Topic: smx	Partition: 0	Leader: 1	Replicas: 3,1,2,4	Isr: 1,2,4
+
+=== 初始稳态: observer(3) 应 NOT in ISR ===
+describe: 	Topic: smx	Partition: 0	Leader: 1	Replicas: 3,1,2,4	Isr: 1,2,4
+  → Leader=1  ISR=1,2,4  (期望 ISR 不含 3)
+
+===== S1: leader broker 崩溃 (kill -9) — 18:56:13Z =====
+初始 leader=1, ISR=1,2,4
+baseline write: 500 records sent, 492.610837 records/sec (0.09 MB/sec), 43.65 ms avg latency, 343.00 ms max latency, 23 ms 50th, 99 ms 95th, 100 ms 99th, 343 ms 99.9th.
+INJECT: kill -9 leader broker 1
+新 leader=2 用时 8959ms (observer=3 绝不能当选)  ISR=2,4
+降级态写入(ISR>=minISR 应成功): 300 records sent, 490.998363 records/sec (0.09 MB/sec), 28.25 ms avg latency, 315.00 ms max latency, 34 ms 50th, 42 ms 95th, 42 ms 99th, 315 ms 99.9th.
+RECOVER: 重启 broker 1
+重启后 ISR=2,4,1
+===== S1 done =====
+
+===== S2: ISR follower 崩溃 — 18:56:43Z =====
+leader=2, 杀 follower=1, ISR=2,4,1
+INJECT: kill -9 follower 1
+ISR shrink 后=2,4 (leader 应不变=2, 实际=2)
+shrink 期间写入(应成功): 300 records sent, 497.512438 records/sec (0.09 MB/sec), 12.94 ms avg latency, 302.00 ms max latency, 12 ms 50th, 24 ms 95th, 25 ms 99th, 302 ms 99.9th.
+RECOVER: 重启 1
+重启后 ISR=2,4,1
+===== S2 done =====
+
+===== S3: observer(3) 崩溃 — 18:57:10Z =====
+pre ISR=2,4,1 (不含3)
+baseline latency: 1000 records sent, 497.760080 records/sec (0.09 MB/sec), 5.47 ms avg latency, 266.00 ms max latency, 2 ms 50th, 17 ms 95th, 18 ms 99th, 266 ms 99.9th.
+INJECT: kill -9 observer broker 3
+observer 死后 ISR=2,4,1 (必须不变,3 本就不在)
+observer 死时写入(零影响,应成功): 500 records sent, 498.504487 records/sec (0.10 MB/sec), 5.85 ms avg latency, 294.00 ms max latency, 2 ms 50th, 17 ms 95th, 18 ms 99th, 294 ms 99.9th.
+RECOVER: 重启 observer 3
+重启后 ISR=2,4,1
+等 observer(3) 追平 leader(2) LEO(停止写入后)...
+leader LEO=2600
+leader(2) vs observer(3) 段文件 md5 (追平后):
+f5f14f85d9654af9e549e7b6e4961315  /home/ec2-user/work/obs-test-3.4.1/data-b2/smx-0/00000000000000000000.log
+f5f14f85d9654af9e549e7b6e4961315  /home/ec2-user/work/obs-test-3.4.1/data-b3/smx-0/00000000000000000000.log
+段文件字节大小 (leader vs observer):
+640051 /home/ec2-user/work/obs-test-3.4.1/data-b2/smx-0/00000000000000000000.log
+640051 /home/ec2-user/work/obs-test-3.4.1/data-b3/smx-0/00000000000000000000.log
+===== S3 done =====
+
+===== S4: 全 ISR primary 崩溃 → 晋升 observer — 18:57:44Z =====
+pre ISR=2,4,1
+pre-kill 数据一致证明(晋升前 observer 字节一致):
+f5f14f85d9654af9e549e7b6e4961315  /home/ec2-user/work/obs-test-3.4.1/data-b2/smx-0/00000000000000000000.log
+f5f14f85d9654af9e549e7b6e4961315  /home/ec2-user/work/obs-test-3.4.1/data-b3/smx-0/00000000000000000000.log
+INJECT: kill -9 所有 primary (1,2,4)
+全 primary 死后: Leader= ISR=4 (observer 3 存活但不应当选)
+此时 acks=all 写入(应失败): timed out
+--- PROMOTE: 从所有 broker 的 observer.ids 删掉 3 --- 18:58:31.725Z
+观察: 是否需要 unclean election 把 3 选上来
+Successfully completed leader election (UNCLEAN) for partitions smx-0
+晋升+选举后 Leader=3 ISR=3 用时 10411ms since file edit
+晋升后从 observer 读数据验证:
+SSXVNJHPDQDXVCRASTVYBCWVMGNYKRXVZXKGXTSPSJDGYLUEGQFLAQLOCFLJBEPOWFNSOMYARHAOPUFOJHHDXEHXJBHWGSMZJGNLONJVXZXZOZITKXJBOZWDJMCBOSYQQKCPRRDCZWMRLFXBLGQPRPGRNTAQOOSVXPKJPJLAVSQCCRXFRROLLHWHOHFGCFWPNDLMWCSS
+HWXQQYKALAAWCMXYLMZALGDESKKTEESEMPRHROVKUMPSXHELIDQEOOHOIHEGJOAZBVPUMCHSHGXZYXXQRUICRIJGQEBBWAXABQRIRUGZJUUVFYQOVCDEDXYFPRLGSGZXSNIAVODTJKSQWHNWVPSAMZKOUDTWHIORJSCZIQYPCZMBYWKDIKOKYNGWPXZWMKRDCMBXKFUI
+LWDHBFXRFAOPRUGDFLPDLHXXCXCUPLWGDPPHEMJGMTVMFQQFVCUPOFYWLDUEBICKPZKHKVMCJVWVKTXBKAPWAPENUEZNWNWDCACDRLPIPHJQQKMOFDQSPKKNURFBORJLBPCBIWTSJNPRBNITTKJYWAHWGKZYNUSFISPIYPIOGAUPZDXHCFVGXGIVVCPFHIXAACZXZLFD
+MOOSSNTKUPJQEIRRQAMUCTBLBSVPDDYOIHAOODZNJTVHDCIEGTAVMYZOCIVSKUNSMXEKBEWNZPRPWPUJABJXNQBOXSHOEGMJSNBUTGTIFVEQPSYBDXEXORPQDDODZGBELOISTRWXMEYWVVHGMJKWLJCCHPKAFRASZEYQZCVLFSLOWTLBMPPWPPFPQSAZPTULSTCDMODY
+KZGSRFQTRFTGCNMNXQQIYVUQZHVNIPHZWVBSGOBYIFDNNXUTBBQUYNXOZCSICGRTZSSRHROJRGBHMHEQJRDLOQBEPTOBMYLMIGPPDPOLTEUVDGATCGYPQOGOYYESKEGBLOCBIYSLQEYGCCIPBXPNSPKDYTBEWDHBHWVDPLOVHJPNYGJUHKKHDASNFGZDAIWWQEPPBRJK
+Processed a total of 5 messages
+===== S4 done =====
+
+=== 恢复集群: 重启 primary 1,2,4, 把 3 降级回 observer ===
+恢复后: Leader=3 ISR=3,1,2,4
+preferred 选举后: Leader=3 ISR=3,1,2,4 (期望 leader 回到 primary, 3 降级出 ISR)
+
+===== S5: 晋升一个滞后的 observer — 18:59:28Z =====
+pre ISR=3,1,2,4
+step1: kill observer 3 冻结其 log
+step2: observer 下线期间灌 30000 条(拉开 lag)
+  2501 records sent, 500.1 records/sec (0.10 MB/sec), 0.4 ms avg latency, 5.0 ms max latency.
+(write timed out / failed)
+step3: leader LEO=17378 (observer 落后约 30000)
+step4: 重启 observer 并立即晋升(最坏 race)
+observer 3 进入 ISR 用时 3292ms (追平后才准入)  ISR=1,2,4,3
+step5: 晋升后 acks=all 写入(3 在 ISR 内): 1000 records sent, 499.251123 records/sec (0.10 MB/sec), 3.52 ms avg latency, 265.00 ms max latency, 1 ms 50th, 16 ms 95th, 17 ms 99th, 265 ms 99.9th.
+关键: HW 从不回退——observer 追平 LEO 后才被准入 ISR, 未追平前不参与
+恢复后 ISR=1,2,4 (3 降级出 ISR)
+===== S5 done =====
+
+===== S6: observer.ids 文件不一致(部分节点删、部分保留) — 19:00:28Z =====
+pre ISR=1,2,4, leader=1
+所有节点 observer.ids 内容: b1=3 b2=3 b3=3 b4=3 
+INJECT: 只在非 leader 的 primary 上清空 observer.ids(制造不一致), leader 保留 3
+等 30s 观察 ISR 是否被错误改变(leader 仍标记 3=observer → 应保持排除)
+不一致期间 ISR=1,2,4 (期望仍不含 3, leader 侧闸门 fail-safe)
+HEAL: 恢复所有节点一致(全部标记 3=observer)
+自愈后 ISR=1,2,4
+===== S6 done =====
+
+===== S7: observer.ids 损坏/权限失败/删除 — 19:01:11Z =====
+pre ISR=1,2,4
+INJECT 7a: chmod 000 leader(1) 的 observer.ids
+权限拒绝后 ISR=1,2,4 (必须不变, 保留缓存值)
+  broker 1 WARN 日志(保留上次值):
+    [2026-07-22 19:01:20,388] WARN Failed to read observer ids from /home/ec2-user/work/obs-test-3.4.1/obs-b1.ids, keeping last value Set(3) (kafka.observer.ObserverIds$)
+    [2026-07-22 19:01:25,395] WARN Failed to read observer ids from /home/ec2-user/work/obs-test-3.4.1/obs-b1.ids, keeping last value Set(3) (kafka.observer.ObserverIds$)
+  权限故障期间写入(应正常): 100 records sent, 375.939850 records/sec (0.07 MB/sec), 17.34 ms avg latency, 259.00 ms max latency, 15 ms 50th, 16 ms 95th, 259 ms 99th, 259 ms 99.9th.
+INJECT 7b: 写垃圾内容(非数字 token 应被静默忽略)
+垃圾内容后 ISR=1,2,4 (id 3 仍被解析出 → 仍排除 3; 垃圾 token 忽略)
+  写入仍正常: 100 records sent, 364.963504 records/sec (0.07 MB/sec), 17.78 ms avg latency, 267.00 ms max latency, 15 ms 50th, 17 ms 95th, 267 ms 99th, 267 ms 99.9th.
+INJECT 7c: 删除文件(回退 env, 未设 → 空集 → 3 变可晋升)
+删除后 ISR=1,2,4,3 (leader 侧文件没了 → 该 broker 视 3 非 observer, 但其他 broker 仍标记)
+RESTORE: 恢复 observer.ids=3 所有节点
+恢复后 ISR=1,2,4 (3 重新降级出 ISR)
+===== S7 done =====
+
+===== S8: controller failover (ZK 模式) — 19:01:59Z =====
+当前 controller broker = 4
+pre ISR=1,2,4
+INJECT: kill -9 controller broker 4(触发 controller failover)
+新 controller = 1 用时 7307ms
+controller failover 后 ISR=1,2 (新 controller 仍正确排除 observer 3)
+  failover 后写入(应正常): 200 records sent, 496.277916 records/sec (0.09 MB/sec), 16.58 ms avg latency, 299.00 ms max latency, 18 ms 50th, 23 ms 95th, 23 ms 99th, 299 ms 99.9th.
+RECOVER: 重启 broker 4
+恢复后 ISR=1,2,4
+===== S8 done =====
+
+=== 测试完成, 停止集群 — 19:02:28Z ===
+
+########################################################
+# Kafka 3.4.1 observer patch 场景验证结束
+# 完成: 2026-07-22T19:02:28Z
+########################################################

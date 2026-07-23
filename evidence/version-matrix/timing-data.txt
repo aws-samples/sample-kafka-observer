@@ -1,0 +1,22 @@
+# 全版本 S1-S8 真机验证时间数据 (东京 ap-northeast-1, m7g)
+# 格式: 版本 模式 S1failover S4晋升 S5追平 S8ctrl
+zk-2.7.2 S1=9147ms S4=10493ms S5=6567ms
+zk-2.8.1 S1=11142ms S4=10495ms S5=6723ms
+zk-2.8.2 S1=9195ms S4=10505ms S5=6699ms
+zk-3.3.2 S1=6963ms S4=10530ms S5=3480ms
+zk-3.0.2 S1=11141ms S4=10384ms S5=3290ms
+zk-3.1.2 S1=8951ms S4=10401ms S5=3297ms
+zk-3.2.3 S1=9242ms S4=10469ms S5=3299ms
+zk-3.4.1 S1=8959ms S4=10411ms S5=3292ms
+zk-3.5.2 S1=10815ms S4=10395ms S5=3264ms
+zk-3.6.2 S1=9182ms S4=10545ms S5=6606ms
+zk-3.7.2 S1=10464ms S4=10291ms S5=3195ms
+zk-3.8.1 S1=8679ms S4=10331ms S5=6373ms
+zk-3.9.2 S1=11075ms S4=10441ms S5=3250ms
+kraft-3.7.2 S1=8971ms S4=10353ms S5=3215ms
+kraft-3.8.1 S1=9017ms S4=10336ms S5=3174ms
+kraft-3.9.2 S1=8919ms S4=10411ms S5=3312ms
+kraft-4.0.2 S1=11582ms S4=10466ms S5=3284ms
+kraft-4.1.2 S1=11709ms S4=10549ms S5=3332ms
+kraft-4.2.1 S1=11678ms S4=10548ms S5=3303ms
+kraft-4.3.1 S1=11468ms S4=10634ms S5=3536ms
