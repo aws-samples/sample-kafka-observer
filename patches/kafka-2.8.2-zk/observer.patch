@@ -1,0 +1,153 @@
+diff --git a/core/src/main/scala/kafka/cluster/Partition.scala b/core/src/main/scala/kafka/cluster/Partition.scala
+index a58f423..61a6d62 100755
+--- a/core/src/main/scala/kafka/cluster/Partition.scala
++++ b/core/src/main/scala/kafka/cluster/Partition.scala
+@@ -795,6 +795,13 @@ class Partition(val topicPartition: TopicPartition,
+   }
+ 
+   private def canAddReplicaToIsr(followerReplicaId: Int): Boolean = {
++    // === OBSERVER PATCH v3 === observer 永不进 ISR。列表来自动态文件(5s 缓存, 零重启)。
++    // 晋升: 从 /opt/kafka/observer.ids 删掉该 id → 下次 fetch 触发 maybeExpandIsr 时此处放行
++    //       → 自动进 ISR → 自动恢复 leader 选举候选资格。
++    if (kafka.observer.ObserverIds.isObserver(followerReplicaId)) {
++      return false
++    }
++    // === END OBSERVER PATCH ===
+     val current = isrState
+     !current.isInflight && !current.isr.contains(followerReplicaId)
+   }
+@@ -881,7 +888,9 @@ class Partition(val topicPartition: TopicPartition,
+     var newHighWatermark = leaderLog.logEndOffsetMetadata
+     remoteReplicasMap.values.foreach { replica =>
+       // Note here we are using the "maximal", see explanation above
+-      if (replica.logEndOffsetMetadata.messageOffset < newHighWatermark.messageOffset &&
++      // === OBSERVER PATCH v3: HW 推进永不等待 observer (它也永远不会加入 ISR) ===
++      if (!kafka.observer.ObserverIds.isObserver(replica.brokerId) &&
++        replica.logEndOffsetMetadata.messageOffset < newHighWatermark.messageOffset &&
+         (curTime - replica.lastCaughtUpTimeMs <= replicaLagTimeMaxMs || isrState.maximalIsr.contains(replica.brokerId))) {
+         newHighWatermark = replica.logEndOffsetMetadata
+       }
+@@ -1001,7 +1010,13 @@ class Partition(val topicPartition: TopicPartition,
+       val candidateReplicaIds = current.isr - localBrokerId
+       val currentTimeMs = time.milliseconds()
+       val leaderEndOffset = localLogOrException.logEndOffset
+-      candidateReplicaIds.filter(replicaId => isFollowerOutOfSync(replicaId, leaderEndOffset, currentTimeMs, maxLagMs))
++      val laggingReplicaIds = candidateReplicaIds.filter(replicaId => isFollowerOutOfSync(replicaId, leaderEndOffset, currentTimeMs, maxLagMs))
++      // === OBSERVER PATCH v3: 降级钩子 ===
++      // 已在 ISR 内但被标记为 observer 的副本, 视同 out-of-sync →
++      // 周期性 isr-expiration 任务自动走原生 shrink 流程将其移出 ISR (零重启降级)。
++      // 之后它想回 ISR 会被 canAddReplicaToIsr 拦住, 状态稳定。
++      laggingReplicaIds ++ candidateReplicaIds.filter(kafka.observer.ObserverIds.isObserver)
++      // === END OBSERVER PATCH ===
+     } else {
+       Set.empty
+     }
+diff --git a/core/src/main/scala/kafka/controller/PartitionStateMachine.scala b/core/src/main/scala/kafka/controller/PartitionStateMachine.scala
+index e812a14..90067f9 100755
+--- a/core/src/main/scala/kafka/controller/PartitionStateMachine.scala
++++ b/core/src/main/scala/kafka/controller/PartitionStateMachine.scala
+@@ -284,7 +284,11 @@ class ZkPartitionStateMachine(config: KafkaConfig,
+       logFailedStateChange(partition, NewPartition, OnlinePartition, new StateChangeFailedException(failMsg))
+     }
+     val leaderIsrAndControllerEpochs = partitionsWithLiveReplicas.map { case (partition, liveReplicas) =>
+-      val leaderAndIsr = LeaderAndIsr(liveReplicas.head, liveReplicas.toList)
++      // === OBSERVER PATCH v3: 初始 ISR 排除 observer, leader 从非 observer 中选 ===
++      // 兜底: 若存活副本全是 observer, 保留原生行为(宁可可用也不空 ISR)
++      val nonObserver = liveReplicas.filterNot(kafka.observer.ObserverIds.isObserver)
++      val isrReplicas = if (nonObserver.nonEmpty) nonObserver else liveReplicas
++      val leaderAndIsr = LeaderAndIsr(isrReplicas.head, isrReplicas.toList)
+       val leaderIsrAndControllerEpoch = LeaderIsrAndControllerEpoch(leaderAndIsr, controllerContext.epoch)
+       partition -> leaderIsrAndControllerEpoch
+     }.toMap
+@@ -523,7 +527,8 @@ object PartitionLeaderElectionAlgorithms {
+   def offlinePartitionLeaderElection(assignment: Seq[Int], isr: Seq[Int], liveReplicas: Set[Int], uncleanLeaderElectionEnabled: Boolean, controllerContext: ControllerContext): Option[Int] = {
+     assignment.find(id => liveReplicas.contains(id) && isr.contains(id)).orElse {
+       if (uncleanLeaderElectionEnabled) {
+-        val leaderOpt = assignment.find(liveReplicas.contains)
++        // === OBSERVER PATCH v3: unclean 选举也不选 observer (宁可无 leader 不丢一致性) ===
++        val leaderOpt = assignment.find(id => liveReplicas.contains(id) && !kafka.observer.ObserverIds.isObserver(id))
+         if (leaderOpt.isDefined)
+           controllerContext.stats.uncleanLeaderElectionRate.mark()
+         leaderOpt
+diff --git a/core/src/main/scala/kafka/observer/ObserverIds.scala b/core/src/main/scala/kafka/observer/ObserverIds.scala
+new file mode 100644
+index 0000000..407ccb9
+--- /dev/null
++++ b/core/src/main/scala/kafka/observer/ObserverIds.scala
+@@ -0,0 +1,76 @@
++package kafka.observer
++
++import java.nio.file.{Files, Path, Paths}
++import kafka.utils.Logging
++import scala.jdk.CollectionConverters._
++import scala.util.Try
++import scala.util.control.NonFatal
++
++/**
++ * === OBSERVER PATCH v3 ===
++ * Observer broker id 的动态来源: 本地文件 (默认 /opt/kafka/observer.ids), 带 5 秒缓存。
++ *
++ * 语义:
++ *   - 文件存在: 以文件内容为准 (每行一个或逗号分隔的 broker id; 支持 # 注释; 空文件 = 无 observer)
++ *   - 文件不存在: 回退读环境变量 KAFKA_OBSERVER_BROKER_IDS (兼容 v1/v2 部署)
++ *   - 文件读取失败 (权限/IO 错误): 保留上一次缓存值, 只打 warn 日志, 绝不影响 broker 运行
++ *
++ * 晋升 = 从文件删 id (下次 fetch 触发 maybeExpandIsr 放行, 自动进 ISR);
++ * 降级 = 把 id 加回文件 (getOutOfSyncReplicas 降级钩子把它视同掉队, isr-expiration 自动 shrink)。
++ * 缓存 5 秒: canAddReplicaToIsr 在 fetch 热路径上, 不能每次读盘; 5 秒对运维操作足够实时。
++ */
++object ObserverIds extends Logging {
++
++  private val CacheTtlNanos: Long = 5L * 1000 * 1000 * 1000 // 5s
++
++  @volatile private var cachedIds: Set[Int] = Set.empty
++  @volatile private var lastRefreshNanos: Long = 0L
++  @volatile private var initialized: Boolean = false
++
++  private def filePath: Path =
++    Paths.get(Option(System.getenv("KAFKA_OBSERVER_IDS_FILE")).getOrElse("/opt/kafka/observer.ids"))
++
++  // 兼容 v1/v2: 文件不存在时回退环境变量
++  // Try(...).toOption 而非 toIntOption: 兼容 Scala 2.12/2.13 双构建
++  private def envFallback: Set[Int] =
++    Option(System.getenv("KAFKA_OBSERVER_BROKER_IDS")).getOrElse("")
++      .split(",").iterator.map(_.trim).filter(_.nonEmpty)
++      .flatMap(s => Try(s.toInt).toOption).toSet
++
++  private def readFromFile(): Set[Int] = {
++    val p = filePath
++    if (!Files.exists(p)) {
++      envFallback
++    } else {
++      Files.readAllLines(p).asScala.iterator
++        .filterNot(_.trim.startsWith("#"))          // 整行注释
++        .flatMap(_.split("[,\\s]+"))                 // 逗号/空白分隔
++        .map(_.trim)
++        .filter(_.nonEmpty)
++        .flatMap(s => Try(s.toInt).toOption)         // 非数字 token 静默忽略
++        .toSet
++    }
++  }
++
++  /** 当前 observer 集合 (5s 缓存)。任何异常都不外抛。 */
++  def current(): Set[Int] = {
++    val now = System.nanoTime()
++    // now - lastRefreshNanos 用减法比较, 对 nanoTime 回绕安全; 首次调用必刷新
++    if (!initialized || now - lastRefreshNanos >= CacheTtlNanos) {
++      try {
++        val fresh = readFromFile()
++        if (fresh != cachedIds)
++          info(s"Observer id set changed: $cachedIds -> $fresh (source: $filePath)")
++        cachedIds = fresh
++      } catch {
++        case NonFatal(e) =>
++          warn(s"Failed to read observer ids from $filePath, keeping last value $cachedIds", e)
++      }
++      lastRefreshNanos = now
++      initialized = true
++    }
++    cachedIds
++  }
++
++  def isObserver(brokerId: Int): Boolean = current().contains(brokerId)
++}
