@@ -3,7 +3,8 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![CI](https://img.shields.io/badge/CI-build--verify%20%C3%97%208%20legs-success)](.github/workflows/build-verify.yml)
 [![Version](https://img.shields.io/badge/release-v0.7.0-informational)](CHANGELOG.md)
-[![Kafka](https://img.shields.io/badge/Kafka-3.6%20%E2%80%93%204.1%20%C2%B7%20ZK%20%2B%20KRaft-231F20?logo=apachekafka)](docs/multi-version.md)
+[![Kafka](https://img.shields.io/badge/Kafka-2.7%20%E2%80%93%204.3%20%C2%B7%20ZK%20%2B%20KRaft-231F20?logo=apachekafka)](docs/version-matrix.md)
+[![Matrix](https://img.shields.io/badge/S1%E2%80%93S8%20matrix-20%20builds%20%C2%B7%20all%20green-30a14e)](docs/version-matrix.md)
 
 **Observer/Learner replicas for Apache Kafka — an open reference implementation.**
 
@@ -109,17 +110,81 @@ Every scenario below was executed on real clusters — the playbook indexes what
 - **Scenario B — all primary replicas down**: un-promoted observer is *never* elected (`Leader: none`, even with unclean election enabled) → promote it → it is elected leader and serves reads/writes. [runbook](docs/runbooks/scenario-b-total-loss.md)
 - Pre-checks, multi-observer layouts, KRaft-specific rules: [docs/runbooks/](docs/runbooks/)
 
-## Version support
+## Version support — the full real-machine matrix
 
-| Kafka version | Mode | Status |
-|---|---|---|
-| 3.7.1 | ZooKeeper | ✅ verified on real clusters (v0.3, [evidence](evidence/observer_v3_lifecycle_evidence.md)) |
-| 3.7.1 | **KRaft** | ✅ **verified — full 8-item capability matrix passed** (v0.5): initial-ISR filtering, unclean election refusal, promotion 4 s / demotion 9 s, promoted observer serves as leader, new-topic instant fetch. Controller-side Java patch (`ObserverReplicas.java` + 3 RCM hooks), verified in both combined and controller-only topologies. [evidence](evidence/kraft_controller_patch_evidence.md) |
-| 3.6.2 / 3.8.1 / 3.9.1 | ZooKeeper | ✅ canonical patch applies + compiles cleanly (real-machine, [evidence](evidence/multiversion_apply_evidence.md)); weekly CI drift sentinel |
-| 4.0.0 | **KRaft** | ✅ **verified on a real 6-node cluster** (v0.6, 3 controllers + 3 brokers): the 8 usable hunks of the 3.7.1 patch applied with line-number drift only (the 2 ZK-controller hunks are dropped — Kafka 4.0 removed ZooKeeper); full capability matrix passed — initial-ISR filtering, full sync, promotion ~4 s / follower demotion ~12 s, preferred election after promotion, unclean election refusal (`Leader: none`, zero data loss). ELR manually enabled and re-verified: observer never enters ELR/LastKnownElr. [port evidence](evidence/kafka40_port_evidence.md) · [ELR evidence](evidence/elr_verification_evidence.md) |
-| 4.1.0 | **KRaft** | ✅ **verified on a real 6-node cluster** (v0.6): patch byte-identical to the 4.0.0 one (hunk offsets only), compiles cleanly. ELR is **default-on** for new 4.1 clusters — verified that observers structurally never enter ELR/LastKnownElr and are never elected even with `unclean.leader.election.enable=true`; ELR members recover with clean election, zero data loss. Includes the upstream KAFKA-19522 fix (fenced last-known-leader mis-election present in 3.7.1/4.0.0). [evidence](evidence/elr_verification_evidence.md) |
+**Every version below was compiled, deployed, and taken through the complete S1–S8 failure
+scenario suite on real EC2 instances** (Tokyo `ap-northeast-1`, Graviton `m7g`), not just
+"patch applies." Each cell is backed by a raw evidence file in
+[`evidence/version-matrix/`](evidence/version-matrix/). Full matrix write-up and the
+per-scenario timing table: [docs/version-matrix.md](docs/version-matrix.md).
 
-Patches: [`patches/kafka-3.7.1-zk/`](patches/kafka-3.7.1-zk/) (ZK-only), [`patches/kafka-3.7.1-kraft/`](patches/kafka-3.7.1-kraft/) (**combined ZK+KRaft** — one patched build serves both modes; deploy `core` + `storage` + `metadata` jars), [`patches/kafka-3.7.1-kraft-v07/`](patches/kafka-3.7.1-kraft-v07/) (combined + the v0.7 metrics/audit layer — functional hooks byte-identical to the combined patch), [`patches/kafka-4.0.0-kraft/`](patches/kafka-4.0.0-kraft/) and [`patches/kafka-4.1.0-kraft/`](patches/kafka-4.1.0-kraft/) (pure KRaft — ZooKeeper is removed upstream in 4.0). Full rationale: [docs/multi-version.md](docs/multi-version.md).
+**Supported floor is Kafka 2.7.** See [Why 2.7 is the floor](#why-27-is-the-earliest-supported-version) below — it is a structural boundary (KIP-497), not a packaging gap.
+
+### ZooKeeper mode (2.7 → 3.9)
+
+| Kafka | Patch | Compile | S1–S8 real-machine | Evidence |
+|---|---|---|---|---|
+| 2.7.2 | [`kafka-2.7.2-zk`](patches/kafka-2.7.2-zk/) | ✅ | ✅ **8/8** | [zk-2.7.2](evidence/old-versions-real-machine/scenario-2.7.2.txt) |
+| 2.8.1 / 2.8.2 | [`kafka-2.8.1-zk`](patches/kafka-2.8.1-zk/) · [`2.8.2`](patches/kafka-2.8.2-zk/) | ✅ | ✅ **8/8** | [2.8.1](evidence/old-versions-real-machine/scenario-2.8.1.txt) · [2.8.2](evidence/old-versions-real-machine/scenario-2.8.2.txt) |
+| 3.0.2 | [`kafka-3.0.2-zk`](patches/kafka-3.0.2-zk/) | ✅ | ✅ **8/8** | [zk-3.0.2](evidence/version-matrix/zk-3.0.2.txt) |
+| 3.1.2 | [`kafka-3.1.2-zk`](patches/kafka-3.1.2-zk/) | ✅ | ✅ **8/8** | [zk-3.1.2](evidence/version-matrix/zk-3.1.2.txt) |
+| 3.2.3 | [`kafka-3.2.3-zk`](patches/kafka-3.2.3-zk/) | ✅ | ✅ **8/8** | [zk-3.2.3](evidence/version-matrix/zk-3.2.3.txt) |
+| 3.3.2 | [`kafka-3.3.2-zk`](patches/kafka-3.3.2-zk/) | ✅ | ✅ **8/8** | [zk-3.3.2](evidence/old-versions-real-machine/scenario-3.3.2.txt) |
+| 3.4.1 | [`kafka-3.4.1-zk`](patches/kafka-3.4.1-zk/) | ✅ | ✅ **8/8** | [zk-3.4.1](evidence/version-matrix/zk-3.4.1.txt) |
+| 3.5.2 | [`kafka-3.5.2-zk`](patches/kafka-3.5.2-zk/) | ✅ | ✅ **8/8** | [zk-3.5.2](evidence/version-matrix/zk-3.5.2.txt) |
+| 3.6.2 | [`kafka-3.6.2-zk`](patches/kafka-3.6.2-zk/) | ✅ | ✅ **8/8** | [zk-3.6.2](evidence/version-matrix/zk-3.6.2.txt) |
+| 3.7.2 | [`kafka-3.7.2-zk`](patches/kafka-3.7.2-zk/) | ✅ | ✅ **8/8** | [zk-3.7.2](evidence/version-matrix/zk-3.7.2.txt) |
+| 3.8.1 | [`kafka-3.8.1-zk`](patches/kafka-3.8.1-zk/) | ✅ | ✅ **8/8** | [zk-3.8.1](evidence/version-matrix/zk-3.8.1.txt) |
+| 3.9.2 | [`kafka-3.9.2-zk`](patches/kafka-3.9.2-zk/) | ✅ | ✅ **8/8** | [zk-3.9.2](evidence/version-matrix/zk-3.9.2.txt) |
+
+### KRaft mode (3.7 → 4.3)
+
+| Kafka | Patch | Compile | S1–S8 real-machine | Evidence |
+|---|---|---|---|---|
+| 3.7.2 | [`kafka-3.7.2-kraft`](patches/kafka-3.7.2-kraft/) | ✅ | ✅ **8/8** | [kraft-3.7.2](evidence/version-matrix/kraft-3.7.2.txt) |
+| 3.8.1 | [`kafka-3.8.1-kraft`](patches/kafka-3.8.1-kraft/) | ✅ | ✅ **8/8** | [kraft-3.8.1](evidence/version-matrix/kraft-3.8.1.txt) |
+| 3.9.2 | [`kafka-3.9.2-kraft`](patches/kafka-3.9.2-kraft/) | ✅ | ✅ **8/8** | [kraft-3.9.2](evidence/version-matrix/kraft-3.9.2.txt) |
+| 4.0.2 | [`kafka-4.0.2-kraft`](patches/kafka-4.0.2-kraft/) | ✅ | ✅ **8/8** | [kraft-4.0.2](evidence/version-matrix/kraft-4.0.2.txt) |
+| 4.1.2 | [`kafka-4.1.2-kraft`](patches/kafka-4.1.2-kraft/) | ✅ | ✅ **8/8** | [kraft-4.1.2](evidence/version-matrix/kraft-4.1.2.txt) |
+| 4.2.1 | [`kafka-4.2.1-kraft`](patches/kafka-4.2.1-kraft/) | ✅ | ✅ **8/8** | [kraft-4.2.1](evidence/version-matrix/kraft-4.2.1.txt) |
+| 4.3.1 | [`kafka-4.3.1-kraft`](patches/kafka-4.3.1-kraft/) | ✅ | ✅ **8/8** | [kraft-4.3.1](evidence/version-matrix/kraft-4.3.1.txt) |
+
+> KRaft has no ZooKeeper (removed upstream in 4.0), so 4.x is KRaft-only. 3.7–3.9 support **both** modes — pick per your cluster.
+> The S1–S8 suite: **S1** leader crash · **S2** ISR follower crash · **S3** observer crash (byte-identical log proven by per-segment md5) · **S4** all-primaries-down → promotion · **S5** lagging-observer promotion (HW never regresses) · **S6** `observer.ids` node-inconsistency (fail-safe) · **S7** file corruption/permission/deletion (broker never crashes) · **S8** controller failover. Timings are consistent across all versions: leader failover ~9–12 s (`≈ replica.lag.time.max.ms` + election), promotion ~10.5 s, lagging catch-up ~3–7 s.
+
+### Do I need a different patch per version?
+
+**Yes — one patch family per source-structure generation, not one patch for everything.**
+A patch is a context-anchored diff, and Kafka's source was refactored several times
+(KIP-497 added AlterIsr in 2.7; 4.0 deleted the ZK controller; 4.2 moved partition state
+to Java). The **5 hook points are semantically identical across every version** — only line
+numbers/context drift — so each version gets its own re-anchored patch, already generated and
+verified in [`patches/`](patches/). Within a minor line the patch is reused verbatim (e.g.
+2.8.1 and 2.8.2 are byte-identical). **Just download the patch dir matching your exact version.**
+
+### Tunable timing (all defaults, all configurable)
+
+| Knob | Default | Effect | Where |
+|---|---|---|---|
+| `replica.lag.time.max.ms` | 10000 ms (we used) / 30000 upstream | Leader failover time ≈ this + election; also gates demotion | broker config |
+| `observer.ids` cache TTL | 5 s (hardcoded) | Promotion/demotion effective latency after editing the file | `ObserverIds.scala` `CacheTtlNanos` — recompile to change |
+| isr-expiration period | `replica.lag.time.max.ms / 2` | How fast a demoted broker leaves ISR | derived |
+| auto-promoter scan interval | 10 s | Auto-detect delay for unattended promotion (S4b) | `observer-auto-promoter.sh -i` |
+
+### Why 2.7 is the earliest supported version
+
+The patch's core gate is the leader-side method `canAddReplicaToIsr`. It was **introduced with
+KIP-497 (AlterIsr) in Kafka 2.7**, which changed ISR management from "leader writes ZooKeeper
+directly" to "leader requests the controller via the AlterIsr API." Before 2.7 that method does
+not exist, so the patch's central hook has nowhere to attach — this is a **structural
+incompatibility, not a missing adaptation.** Confirmed by real-machine function probing:
+
+| Kafka | `canAddReplicaToIsr` | ISR model | Result |
+|---|---|---|---|
+| 2.4.1 / 2.5.1 / 2.6.3 | ❌ absent | leader-writes-ZK (old) | **Not supported** — no hook site |
+| **2.7.x** and later | ✅ present | AlterIsr / KRaft | ✅ Supported (verified through 4.3) |
+
+Older releases (≤ 2.6) would require a fundamentally different mechanism and are out of scope.
 
 ## Operability
 

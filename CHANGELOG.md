@@ -11,6 +11,27 @@ the current design. Nothing before v1.0 carries API-stability guarantees.
 
 ### Added
 
+- **Full version matrix — Kafka 2.7 → 4.3, real-machine S1–S8.** Extended the
+  supported range from "3.6–4.1" to the entire 2.7 → 4.3 line and verified it
+  the hard way: **20 builds (12 ZooKeeper + 7 KRaft) each compiled, deployed,
+  and taken through the complete S1–S8 failure suite on real EC2 (Tokyo m7g)**,
+  all green. New per-version patches under `patches/` (2.7.2, 2.8.x, 3.0.2,
+  3.1.2, 3.2.3, 3.4.1, 3.5.2, 3.6.2, 3.7.2, 3.8.1, 3.9.2 ZK; 3.7.2–4.3.1 KRaft),
+  raw evidence in `evidence/version-matrix/` and
+  `evidence/old-versions-real-machine/`, full write-up in
+  [`docs/version-matrix.md`](docs/version-matrix.md). Scenario harnesses shipped:
+  `tools/zk-scenario-test.sh` and `tools/kraft-scenario-test.sh`.
+- **Documented support floor = Kafka 2.7**, with the structural reason: the core
+  gate `canAddReplicaToIsr` was introduced by KIP-497 (AlterIsr) in 2.7; real-machine
+  probing confirmed 2.4/2.5/2.6 lack the method entirely (leader-writes-ZK model),
+  so they are structurally incompatible, not merely un-adapted.
+- **Per-version patch families explained**: one patch per source-structure generation
+  (not one universal patch); byte-identical within a minor line (2.8.1 == 2.8.2).
+  4.2/4.3 required re-anchoring `getOutOfSyncReplicas` for the Scala→Java ISR
+  collection change (`.asScala.map(_.toInt)`); observer hook logic unchanged.
+- **Tunable-timing reference** in README and `docs/version-matrix.md`:
+  `replica.lag.time.max.ms` (failover), `observer.ids` cache TTL (5 s, promotion
+  latency), isr-expiration period (= lag/2), auto-promoter scan interval (`-i`).
 - GitHub community-health files: `CODEOWNERS`, structured bug-report issue
   template, pull-request template with a verification checklist.
 
@@ -25,6 +46,13 @@ the current design. Nothing before v1.0 carries API-stability guarantees.
   (`--replica-assignment 3:1:2:4`, 4 brokers + 3 dedicated controllers).
   The minimum verified topology (RF3 = 2 ISR + 1 observer) remains fully
   tested and documented as a footnote.
+- KRaft scenario harness now forces leadership off the observer during recovery
+  before demoting it (`ensure_observer_demoted`). The first KRaft matrix pass
+  left the observer stuck as leader after the S4/S5 promotion cycle (KRaft won't
+  hot-demote a leader observer — a real, documented limitation), which
+  contaminated the S6–S8 preconditions; all seven KRaft versions were re-run
+  with the fix and the corrected evidence confirms observer-free S6/S7/S8
+  preconditions.
 
 ### Planned (v0.8 outlook)
 
