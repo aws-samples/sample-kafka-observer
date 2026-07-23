@@ -9,6 +9,8 @@ the current design. Nothing before v1.0 carries API-stability guarantees.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-23
+
 ### Added
 
 - **Full version matrix — Kafka 2.7 → 4.3, real-machine S1–S8.** Extended the
